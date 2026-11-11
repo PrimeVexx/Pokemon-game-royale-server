@@ -1205,7 +1205,7 @@ drawSpr0 = function(g, mn, x, y, px, sc) {
   }
   g.restore();
 };
-/* === MULTIJUGADOR SINCRONIZADO (SEED), 15 SPAWNS EN TODO EL MAPA Y REVIVIR AUTOMÁTICO === */
+/* === PARTE 1: LOBBY FORTNITE + CONTROL EXCLUSIVO DEL LÍDER === */
 document.head.insertAdjacentHTML('beforeend', `
 <style>
   .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
@@ -1226,54 +1226,31 @@ document.body.insertAdjacentHTML('beforeend', `
     </div>
   </div>
 `);
-/* === MULTIJUGADOR SINCRONIZADO, AVIÓN INTACTO, HORDA/RAYQUAZA Y REVIVIR 5S === */
-document.head.insertAdjacentHTML('beforeend', `
-<style>
-  .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
-  .ps-mate canvas { width:150px; height:165px; image-rendering:pixelated; }
-  .ps-ped { width:130px; height:18px; margin-top:-12px; border-radius:50%; background:radial-gradient(#4fc3ff, #2bf8 55%, transparent 72%); }
-  .ps-tag { background:#000b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-bottom:2px; border:1px solid #4fc3ff88; }
-  #spec-banner { position:fixed; top:55px; left:50%; transform:translateX(-50%); z-index:10; background:#000c; border:2px solid #4fc3ff; color:#fff; padding:6px 16px; border-radius:8px; font-weight:800; font-size:13px; display:none; text-align:center; pointer-events:none; }
-  #rev-box { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:12; background:#000d; border:2px solid #4cd964; border-radius:10px; padding:10px 18px; text-align:center; display:none; min-width:190px; pointer-events:none; }
-</style>
-`);
 
-document.body.insertAdjacentHTML('beforeend', `
-  <div id="spec-banner">👀 ESPECTANDO A TU COMPAÑERO · Esperando que te reviva...</div>
-  <div id="rev-box">
-    <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
-    <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
-      <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
-    </div>
-  </div>
-`);
-/* === PARTE 1: ESTILOS LOBBY Y AVISOS DE RESCATE === */
-document.head.insertAdjacentHTML('beforeend', `
-<style>
-  .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
-  .ps-mate canvas { width:150px; height:165px; image-rendering:pixelated; }
-  .ps-ped { width:130px; height:18px; margin-top:-12px; border-radius:50%; background:radial-gradient(#4fc3ff, #2bf8 55%, transparent 72%); }
-  .ps-tag { background:#000b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-bottom:2px; border:1px solid #4fc3ff88; }
-  #spec-banner { position:fixed; top:55px; left:50%; transform:translateX(-50%); z-index:10; background:#000c; border:2px solid #4fc3ff; color:#fff; padding:6px 16px; border-radius:8px; font-weight:800; font-size:13px; display:none; text-align:center; pointer-events:none; }
-  #rev-box { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:12; background:#000d; border:2px solid #4cd964; border-radius:10px; padding:10px 18px; text-align:center; display:none; min-width:190px; pointer-events:none; }
-</style>
-`);
+let isLeader = true;
 
-document.body.insertAdjacentHTML('beforeend', `
-  <div id="spec-banner">👀 ESPECTANDO A TU COMPAÑERO · Esperando que te reviva...</div>
-  <div id="rev-box">
-    <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
-    <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
-      <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
-    </div>
-  </div>
-`);
+function updateLeaderUI() {
+  const inGroup = !!R;
+  const canControl = !inGroup || isLeader;
+  const playBtn = $('play');
+  const m1Btn = $('m1');
+  const tmoBtn = $('tmo');
+
+  if (playBtn) {
+    playBtn.disabled = !canControl;
+    playBtn.textContent = canControl ? 'JUGAR' : 'ESPERANDO AL LÍDER...';
+    playBtn.style.opacity = canControl ? '1' : '0.6';
+  }
+  if (m1Btn) m1Btn.disabled = !canControl;
+  if (tmoBtn) tmoBtn.style.pointerEvents = canControl ? 'auto' : 'none';
+}
 
 slots = function() {
+  updateLeaderUI();
   const el = $('slots');
   if (!el) return;
   const mates = PE.filter(p => p && p.u && p.u !== MYID).slice(0, 3);
-  const sig = mates.map(p => `${p.u}:${p.n}:${p.mn}:${p.skin}`).join('|');
+  const sig = mates.map(p => `${p.u}:${p.n}:${p.mn}:${p.skin}:${p.leader}`).join('|');
   if (el.dataset.sig === sig) return;
   el.dataset.sig = sig;
   el.innerHTML = '';
@@ -1295,9 +1272,10 @@ slots = function() {
       const mn = MON[p.mn] ? p.mn : 'Pikachu';
       const k = SK[p.skin];
       const sc = k && (!k.only || k.only === mn) ? k.c : null;
+      const crown = p.leader ? '👑 ' : '🟢 ';
       d.innerHTML = `
         <div class="ps-mate">
-          <div class="ps-tag">🟢 ${esc(p.n || 'Amigo')}</div>
+          <div class="ps-tag">${crown}${esc(p.n || 'Amigo')}</div>
           <canvas width="150" height="165"></canvas>
           <div class="ps-ped"></div>
         </div>`;
@@ -1309,8 +1287,8 @@ slots = function() {
     el.appendChild(d);
   });
 };
-setInterval(slots, 500);
-/* === PARTE 2: HORDA Y RAYQUAZA INTACTOS + 15 ENEMIGOS EN TODO EL MAPA (BR) === */
+setInterval(slots, 400);
+  /* === PARTE 2: PARTIDA DE 10 JUGADORES Y BOTS IDÉNTICOS SINCRONIZADOS === */
 let MATCH_SEED = 123456;
 function seededRng(seed) {
   let s = (seed || 123456) % 2147483647;
@@ -1318,9 +1296,8 @@ function seededRng(seed) {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-const ALL_REGIONS = [, [1350, 400], [2150, 450], [700, 1100], [700, 1450],
-, [1950, 1200], [2050, 1900], [1400, 1950], [620, 2300],
-, [1750, 850], [1050, 1650], [1750, 1600], [1400, 1000]
+const TEN_REGIONS = [,   // Pallet Town,  // Mt. Moon,  // Cerulean City,  // Viridian Forest, // Pokémon League, // Rock Tunnel, // Safari Zone,  // Cinnabar Island, // Lago Sur
+  [1050, 900]   // Llanura Central
 ];
 
 const _origStart = start;
@@ -1338,38 +1315,63 @@ start = function() {
     const names = NAMES.slice().sort(() => rng() - 0.5);
     const ks = Object.keys(MON).filter(k => !MON[k].pass);
 
-    for (let i = 1; i < G.f.length; i++) {
+    // Total de 10 personas en la partida (jugadores reales + bots hasta completar 10)
+    const mates = PE.filter(p => p && p.u && p.u !== MYID);
+    const totalBots = Math.max(0, 9 - mates.length);
+    G.f.length = 1;
+
+    for (let i = 0; i < totalBots; i++) {
       const monName = ks[Math.floor(rng() * ks.length)];
-      const m = MON[monName];
-      const spot = ALL_REGIONS[(i - 1) % ALL_REGIONS.length];
-      G.f[i].mn = monName;
-      G.f[i].m = m;
-      G.f[i].n = names[i % names.length];
-      G.f[i].hp = G.f[i].max = m.hp * 0.85;
-      G.f[i].tx = spot[0] + (rng() - 0.5) * 120;
-      G.f[i].ty = spot[1] + (rng() - 0.5) * 120;
-      G.f[i].jt = 1.5 + ((i * 0.9) % 13.5);
+      const bot = mk(monName, names[i % names.length], 1, '');
+      const spot = TEN_REGIONS[(i + 1) % TEN_REGIONS.length];
+      bot.onp = 1;
+      bot.air = 0;
+      bot.tx = spot[0] + (rng() - 0.5) * 90;
+      bot.ty = spot[1] + (rng() - 0.5) * 90;
+      bot.jt = 1.5 + ((i * 1.3) % 12);
+      G.f.push(bot);
     }
 
+    // Cofres en posiciones idénticas para todos
     for (let i = 0; i < G.ch.length; i++) {
-      const reg = ALL_REGIONS[i % ALL_REGIONS.length];
-      G.ch[i].x = Math.max(80, Math.min(WD - 80, reg[0] + (rng() - 0.5) * 450));
-      G.ch[i].y = Math.max(80, Math.min(WD - 80, reg[1] + (rng() - 0.5) * 450));
+      const reg = TEN_REGIONS[i % TEN_REGIONS.length];
+      G.ch[i].x = Math.max(80, Math.min(WD - 80, reg[0] + (rng() - 0.5) * 420));
+      G.ch[i].y = Math.max(80, Math.min(WD - 80, reg[1] + (rng() - 0.5) * 420));
     }
   }
 };
 
+// Si eres invitado, sincronizar los bots con los datos en vivo del líder para que sean 100% iguales
 const _origUpd = upd;
 upd = function(dt) {
-  const savedTargets = (G && G.mode !== 'h' && !G.rq && G.f)
+  const savedTargets = (G && G.mode === 'br' && G.f)
     ? G.f.map(f => ({ onp: f.onp, tx: f.tx, ty: f.ty }))
     : [];
   _origUpd(dt);
-  if (G && G.mode !== 'h' && !G.rq && G.f) {
+  if (G && G.mode === 'br' && G.f) {
     for (let i = 1; i < G.f.length; i++) {
       if (savedTargets[i] && savedTargets[i].onp && !G.f[i].onp) {
         G.f[i].tx = savedTargets[i].tx;
         G.f[i].ty = savedTargets[i].ty;
+      }
+    }
+    // Si no soy el líder, copiar posición, vida y estado exacto de cada bot desde el líder
+    if (R && !isLeader) {
+      const leader = PE.find(p => p.leader);
+      if (leader && Array.isArray(leader.bots)) {
+        leader.bots.forEach((b, idx) => {
+          const localBot = G.f[idx + 1];
+          if (localBot && b) {
+            localBot.x = b.x;
+            localBot.y = b.y;
+            localBot.hp = b.hp;
+            localBot.alive = b.alive;
+            localBot.onp = b.onp;
+            localBot.air = b.air;
+            localBot.mn = b.mn;
+            localBot.n = b.n;
+          }
+        });
       }
     }
   }
@@ -1388,7 +1390,30 @@ function launchGroupMode(mode, seed) {
   else queue();
 }
 
+// Ajustar texto de lobby a 10 jugadores
+const _origMenu = menu;
+menu = function() {
+  _origMenu();
+  if (S.mode === 'br' && $('msub')) $('msub').textContent = 'Grupo · 10 jugadores';
+  updateLeaderUI();
+};
+
+// Bloquear cambio de modo a quienes no son líderes del grupo
+const _origRmodes = rmodes;
+rmodes = function() {
+  if (R && !isLeader) {
+    tst('Solo el creador del grupo puede elegir el modo');
+    go('menu');
+    return;
+  }
+  _origRmodes();
+};
+
 $('play').onclick = () => {
+  if (R && !isLeader) {
+    tst('Solo el líder del grupo puede iniciar la partida');
+    return;
+  }
   MATCH_SEED = Math.floor(100000 + Math.random() * 899999);
   myGoTs = Date.now();
   myGoMode = S.mode;
@@ -1396,43 +1421,52 @@ $('play').onclick = () => {
   if (R) {
     R.presence({
       n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
-      go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
+      leader: 1, go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
       downed: 0, reviveTarget: ''
     });
   }
   launchGroupMode(S.mode, MATCH_SEED);
 };
 
-pj = async function(c) {
+pj = async function(c, creator = false) {
   $('pc').textContent = c;
   if (!R0) { try { R0 = await claude.use('room'); } catch (e) {} }
   if (!R0) { $('pm').textContent = 'Sin conexión con el servidor (código ' + c + ')'; return; }
   try {
     if (R) await R.leave();
+    isLeader = creator;
     R = await R0.join('PR-' + c);
     $('pc').textContent = c;
-    R.presence({ n: MYN, mn: S.sel, skin: S.skin || '', u: MYID, go: 0, downed: 0, reviveTarget: '' });
+    updateLeaderUI();
+    R.presence({ n: MYN, mn: S.sel, skin: S.skin || '', u: MYID, leader: isLeader ? 1 : 0, go: 0, mode: S.mode, downed: 0, reviveTarget: '' });
     R.onPeers(() => {
       const ps = R.peers();
       PE = ps.map(p => p.presence).filter(p => p && p.u && p.u !== MYID);
       $('pm').textContent = PE.length
-        ? 'En grupo: ' + PE.map(p => p.n).join(', ')
+        ? 'En grupo: ' + PE.map(p => (p.leader ? '👑 ' : '') + p.n).join(', ')
         : 'Comparte el código ' + c + ' con tus amigos…';
       slots();
 
-      const starter = PE.find(p => p.go && p.go > lastgo && Date.now() - p.go < 10000);
-      if (starter) {
-        lastgo = starter.go;
-        launchGroupMode(starter.mode || 'br', starter.seed || 123456);
+      // Sincronizar el modo visual del lobby con el que eligió el líder
+      const leader = PE.find(p => p.leader);
+      if (leader && !isLeader && leader.mode && leader.mode !== S.mode && (!G || G.over)) {
+        S.mode = leader.mode;
+        menu();
+      }
+
+      // Entrar automáticamente cuando el líder inicie cualquier modo
+      if (leader && !isLeader && leader.go && leader.go > lastgo && Date.now() - leader.go < 10000) {
+        lastgo = leader.go;
+        launchGroupMode(leader.mode || 'br', leader.seed || 123456);
       }
     });
   } catch (e) {
     say('No se pudo unir al grupo');
   }
 };
-$('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase());
-$('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase()); };
-/* === PARTE 3: MODO ESPECTADOR Y RESCATE AUTOMÁTICO EN 5 SEGUNDOS === */
+$('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase(), true);
+$('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase(), false); };
+/* === PARTE 3: TRANSMISIÓN DE BOTS DEL LÍDER + RESCATE AUTOMÁTICO EN 5S === */
 let downed = false;
 let spectating = null;
 let revTimer = 0;
@@ -1441,7 +1475,7 @@ let myRevivePing = '';
 
 const _hitOrig = hit;
 hit = function(f, d, by) {
-  if (!f.bot && G && G.mode !== 'h' && !G.rq && f.hp - d <= 0 && f.alive && !downed) {
+  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive && !downed) {
     const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
     if (aliveMates.length > 0) {
       f.hp = 1;
@@ -1494,7 +1528,7 @@ setInterval(() => {
     if (R) {
       R.presence({
         n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
-        go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
+        leader: isLeader ? 1 : 0, go: myGoTs, mode: S.mode, seed: MATCH_SEED,
         hp: 0, downed: 0, reviveTarget: ''
       });
     }
@@ -1502,6 +1536,13 @@ setInterval(() => {
   }
 
   const me = G.f[0];
+  const botsPayload = (isLeader && G.mode === 'br')
+    ? G.f.slice(1).map(b => ({
+        x: Math.round(b.x), y: Math.round(b.y),
+        hp: Math.round(b.hp), alive: b.alive,
+        onp: b.onp, air: b.air, mn: b.mn, n: b.n
+      }))
+    : undefined;
 
   if (R) {
     R.presence({
@@ -1515,9 +1556,11 @@ setInterval(() => {
       mn: me.mn,
       n: MYN,
       u: MYID,
+      leader: isLeader ? 1 : 0,
       go: myGoTs,
       mode: myGoMode,
       seed: MATCH_SEED,
+      bots: botsPayload,
       downed: downed ? 1 : 0,
       dx: downed ? Math.round(me.x) : null,
       dy: downed ? Math.round(me.y) : null,
