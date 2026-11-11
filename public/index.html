@@ -624,5 +624,9 @@ if(ft[k]==2&&Y<Z*.55&&((X-M+.5)*N/L)%1<.4&&((Y-M+.5)*N/L)%1<.4){r=gg=b=255}
 else if(al[k-1]||al[k+1]||al[k-Z]||al[k+Z]){d[o]=15;d[o+1]=56;d[o+2]=15;d[o+3]=255}}
 g.putImageData(im,0,0);return c}
 drawSpr0=function(g,mn,x,y,px,sc){if(!SPR[mn])return;const rb=sc=='rainbow',bc=rb?RB():(sc||BC[mn]||MON[mn].c),key=mn+'|'+(rb?'rb'+Math.floor(Date.now()/15%360/20):bc);let c=SC64.get(key);if(!c){c=spr64(mn,bc);SC64.set(key,c)}const S=12*px,T=S*64/56,o=(T-S)/2;g.imageSmoothingEnabled=T<64;g.drawImage(c,x-o,y-o,T,T)};
-(()=>{const s=lg('pr3_sess'),u=s&&US().find(x=>uk(x)==s);if(u)enter(u,1)})();
-</script></body></html>
+go('menu');
+</script>
+<script src="config.js"></script>
+<script src="net.js"></script>
+</body></html>
+
