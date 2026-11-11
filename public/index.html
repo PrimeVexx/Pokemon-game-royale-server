@@ -1205,14 +1205,21 @@ drawSpr0 = function(g, mn, x, y, px, sc) {
   }
   g.restore();
 };
-  /* 3. MODO ESPECTADOR Y REVIVIR AUTOMÁTICO AL PARARSE ENCIMA (5 SEGUNDOS) */
-let downed = false;
-let spectating = null;
-let revTimer = 0;
-let revTargetId = null;
+/* === MULTIJUGADOR SINCRONIZADO (SEED), 15 SPAWNS EN TODO EL MAPA Y REVIVIR AUTOMÁTICO === */
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+  .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
+  .ps-mate canvas { width:150px; height:165px; image-rendering:pixelated; }
+  .ps-ped { width:130px; height:18px; margin-top:-12px; border-radius:50%; background:radial-gradient(#4fc3ff, #2bf8 55%, transparent 72%); }
+  .ps-tag { background:#000b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-bottom:2px; border:1px solid #4fc3ff88; }
+  #spec-banner { position:fixed; top:55px; left:50%; transform:translateX(-50%); z-index:10; background:#000c; border:2px solid #4fc3ff; color:#fff; padding:6px 16px; border-radius:8px; font-weight:800; font-size:13px; display:none; text-align:center; pointer-events:none; }
+  #rev-box { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:12; background:#000d; border:2px solid #4cd964; border-radius:10px; padding:10px 18px; text-align:center; display:none; min-width:190px; pointer-events:none; }
+</style>
+`);
 
 document.body.insertAdjacentHTML('beforeend', `
-  <div id="rev-box" style="position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:12;background:#000d;border:2px solid #4cd964;border-radius:10px;padding:10px 18px;text-align:center;display:none;min-width:190px;pointer-events:none">
+  <div id="spec-banner">👀 ESPECTANDO A TU COMPAÑERO · Esperando que te reviva...</div>
+  <div id="rev-box">
     <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
     <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
       <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
@@ -1220,9 +1227,175 @@ document.body.insertAdjacentHTML('beforeend', `
   </div>
 `);
 
+/* 1. LOBBY ESTILO FORTNITE */
+slots = function() {
+  const el = $('slots');
+  if (!el) return;
+  const mates = PE.filter(p => p && p.u && p.u !== MYID).slice(0, 3);
+  const sig = mates.map(p => `${p.u}:${p.n}:${p.mn}:${p.skin}`).join('|');
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  el.innerHTML = '';
+
+  const coords = [
+    { left: '14%', bottom: '40%' },
+    { left: '68%', bottom: '40%' },
+    { left: '84%', bottom: '45%' }
+  ];
+
+  coords.forEach((pos, i) => {
+    const p = mates[i];
+    const d = document.createElement('div');
+    d.className = 'ps';
+    d.style.left = pos.left;
+    d.style.bottom = pos.bottom;
+
+    if (p) {
+      const mn = MON[p.mn] ? p.mn : 'Pikachu';
+      const k = SK[p.skin];
+      const sc = k && (!k.only || k.only === mn) ? k.c : null;
+      d.innerHTML = `
+        <div class="ps-mate">
+          <div class="ps-tag">🟢 ${esc(p.n || 'Amigo')}</div>
+          <canvas width="150" height="165"></canvas>
+          <div class="ps-ped"></div>
+        </div>`;
+      drawSpr(d.querySelector('canvas').getContext('2d'), mn, 10, 5, 11, sc);
+    } else {
+      d.innerHTML = '<div class="plus">+</div>';
+      d.firstChild.onclick = openFr;
+    }
+    el.appendChild(d);
+  });
+};
+setInterval(slots, 500);
+
+/* 2. SEMILLA COMPARTIDA Y 15 PUNTOS REPARTIDOS POR TODO EL MAPA */
+let MATCH_SEED = Date.now() % 2147483647;
+function seededRng(seed) {
+  let s = (seed || 12345) % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+
+// 15 ubicaciones estratégicas cubriendo cada región del mapa (2800x2800)
+const MAP_SPAWNS = [,   // Pallet Town,  // Mt. Moon,  // Cerulean City,  // Viridian Forest Norte,  // Viridian Forest Sur, // Pokémon League Centro, // Rock Tunnel, // Safari Zone, // Lago Sur,  // Cinnabar Island,  // Llanura Oeste,  // Llanura Este, // Costa Suroeste, // Costa Sureste
+  [1400, 950]   // Meseta Central
+];
+
+// Sobrescribir start() para que ambos jugadores generen exactamente los mismos 15 enemigos y posiciones
+start = function() {
+  const rng = seededRng(MATCH_SEED);
+  const names = NAMES.slice().sort(() => rng() - 0.5);
+  const ks = Object.keys(MON).filter(k => !MON[k].pass);
+  const sk = SK[S.skin] && (!SK[S.skin].only || SK[S.skin].only == S.sel) ? S.skin : '';
+
+  const peersInGroup = PE.filter(p => p && p.u && p.u !== MYID);
+  const botCount = Math.max(1, 14 - peersInGroup.length);
+
+  G = { f: [mk(S.sel, MYN || 'Tú', 0, sk)], p: [], ch: [], T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
+
+  // Ubicar al jugador local en el primer spawn de la semilla
+  const mySpot = MAP_SPAWNS[Math.floor(rng() * MAP_SPAWNS.length)];
+  G.f[0].x = mySpot[0];
+  G.f[0].y = mySpot[1];
+
+  // Crear los bots deterministas repartidos en las 15 zonas del mapa
+  for (let i = 0; i < botCount; i++) {
+    const monName = ks[Math.floor(rng() * ks.length)];
+    const bot = mk(monName, names[i % names.length], 1, '');
+    const spot = MAP_SPAWNS[(i + 1) % MAP_SPAWNS.length];
+    bot.x = spot[0] + (rng() - 0.5) * 80;
+    bot.y = spot[1] + (rng() - 0.5) * 80;
+    bot.tx = spot[0];
+    bot.ty = spot[1];
+    G.f.push(bot);
+  }
+
+  // Generar los 70 cofres en las mismas coordenadas para todo el grupo
+  for (let i = 0; i < 70; i++) {
+    let cxp = 120 + rng() * (WD - 240);
+    let cyp = 120 + rng() * (WD - 240);
+    G.ch.push({ x: cxp, y: cyp });
+  }
+
+  G.f.forEach((f, idx) => {
+    f.onp = 1;
+    f.air = 0;
+    f.jt = 1.5 + ((idx * 1.7) % 12);
+  });
+
+  downed = false;
+  spectating = null;
+  revTimer = 0;
+  revTargetId = null;
+  $('rev-box').style.display = 'none';
+  $('spec-banner').style.display = 'none';
+  $('atk').style.display = 'block';
+  ['menu', 'shop', 'end', 'inv', 'modes', 'fr'].forEach(s => $(s).classList.remove('on'));
+  say('✈️ Pulsa SALTAR para caer en el mapa (15 enemigos activos)', 5);
+};
+
+/* 3. SINCRONIZACIÓN DE GRUPO PARA ENTRAR JUNTOS A CUALQUIER MODO */
+function launchGroupMode(mode, seed) {
+  S.mode = mode || 'br';
+  MATCH_SEED = seed || MATCH_SEED;
+  menu();
+  if (S.mode === 'h') startH();
+  else if (S.mode === 'rq') startRQ();
+  else queue();
+}
+
+$('play').onclick = () => {
+  MATCH_SEED = Math.floor(100000 + Math.random() * 899999);
+  if (R) {
+    lastgo = Date.now();
+    R.presence({ go: lastgo, mode: S.mode, seed: MATCH_SEED, downed: 0, reviveTarget: '' });
+  }
+  launchGroupMode(S.mode, MATCH_SEED);
+};
+
+// Reemplazar pj para escuchar cambios de grupo y arranque en todos los modos
+pj = async function(c) {
+  $('pc').textContent = c;
+  if (!R0) { try { R0 = await claude.use('room'); } catch (e) {} }
+  if (!R0) { $('pm').textContent = 'Sin conexión con el servidor (código ' + c + ')'; return; }
+  try {
+    if (R) await R.leave();
+    R = await R0.join('PR-' + c);
+    $('pc').textContent = c;
+    R.presence({ n: MYN, mn: S.sel, skin: S.skin || '', u: MYID, downed: 0, reviveTarget: '' });
+    R.onPeers(() => {
+      const ps = R.peers();
+      PE = ps.map(p => p.presence).filter(p => p && p.u && p.u !== MYID);
+      $('pm').textContent = PE.length
+        ? 'En grupo: ' + PE.map(p => p.n).join(', ')
+        : 'Comparte el código ' + c + ' con tus amigos…';
+      slots();
+
+      const starter = PE.find(p => p.go && p.go > lastgo && Date.now() - p.go < 8000);
+      if (starter) {
+        lastgo = starter.go;
+        launchGroupMode(starter.mode || 'br', starter.seed || 12345);
+      }
+    });
+  } catch (e) {
+    say('No se pudo unir al grupo');
+  }
+};
+$('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase());
+$('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase()); };
+
+/* 4. ESPECTAR Y REVIVIR AUTOMÁTICO AL PARARSE ENCIMA (5 SEGUNDOS) */
+let downed = false;
+let spectating = null;
+let revTimer = 0;
+let revTargetId = null;
+let myRevivePing = '';
+
 const _hitOrig = hit;
 hit = function(f, d, by) {
-  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive) {
+  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive && !downed) {
     const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
     if (aliveMates.length > 0) {
       f.hp = 1;
@@ -1239,13 +1412,7 @@ hit = function(f, d, by) {
   _hitOrig(f, d, by);
 };
 
-function resetRevive() {
-  revTimer = 0;
-  revTargetId = null;
-  $('rev-box').style.display = 'none';
-}
-
-// Dibujar el círculo verde en el suelo donde cayó el compañero
+// Dibujar el círculo verde de rescate en el suelo
 const _drawOrig = draw;
 draw = function() {
   _drawOrig();
@@ -1261,83 +1428,105 @@ draw = function() {
       cx.lineWidth = 3;
       cx.setLineDash([8, 6]);
       cx.beginPath();
-      cx.arc(sx, sy, 32 * sc, 0, 7);
+      cx.arc(sx, sy, 34 * sc, 0, 7);
       cx.stroke();
       cx.setLineDash([]);
       cx.fillStyle = '#4cd964';
       cx.font = 'bold 12px sans-serif';
       cx.textAlign = 'center';
-      cx.fillText('➕ ' + p.n, sx, sy - 38 * sc);
+      cx.fillText('➕ ' + p.n, sx, sy - 40 * sc);
       cx.restore();
     }
   });
 };
 
-// Revisar cada 0.1s si estás espectando o parado encima de un compañero caído
+// Bucle de sincronización y conteo automático de 5s integrado
 setInterval(() => {
   if (!G || G.over) {
     $('spec-banner').style.display = 'none';
-    resetRevive();
+    $('rev-box').style.display = 'none';
     downed = false;
+    revTimer = 0;
+    revTargetId = null;
     return;
   }
 
   const me = G.f[0];
 
-  // Si estás caído espectando
+  // Enviar estado completo sin borrar downed ni reviveTarget
+  if (R) {
+    R.presence({
+      x: Math.round(me.x),
+      y: Math.round(me.y),
+      fx: +me.fx.toFixed(1),
+      fy: +me.fy.toFixed(1),
+      hp: downed ? 0 : Math.round(me.hp),
+      max: me.max,
+      skin: me.skin || '',
+      mn: me.mn,
+      n: MYN,
+      u: MYID,
+      downed: downed ? 1 : 0,
+      dx: downed ? Math.round(me.x) : null,
+      dy: downed ? Math.round(me.y) : null,
+      reviveTarget: myRevivePing
+    });
+  }
+
+  // Modo espectador si estoy abatido
   if (downed) {
-    resetRevive();
-    const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
-              || PE.find(p => p.u !== MYID && p.hp > 0 && !p.downed);
-
-    if (mate) {
-      spectating = mate;
-      me.x = mate.x;
-      me.y = mate.y;
-      $('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
-
-      if (mate.reviveTarget === MYID) {
-        downed = false;
-        me.alive = 1;
-        me.hp = Math.round(me.max * 0.6);
-        me.x = mate.x + 25;
-        me.y = mate.y + 25;
-        $('atk').style.display = 'block';
-        $('spec-banner').style.display = 'none';
-        say('💖 ¡' + mate.n + ' te ha revivido!', 4);
-        if (R) R.presence({ hp: me.hp, downed: 0 });
-      }
-    } else {
-      downed = false;
-      $('spec-banner').style.display = 'none';
-      end(alive().length + 1);
-    }
-    return;
-  }
-
-  // Si estás vivo, detectar automáticamente si estás parado encima (< 42 píxeles)
-  const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 42);
-
-  if (fallen) {
-    if (revTargetId !== fallen.u) {
-      revTargetId = fallen.u;
-      revTimer = 5.0;
-    }
-    revTimer = Math.max(0, revTimer - 0.1);
-    const pct = ((5.0 - revTimer) / 5.0) * 100;
-    $('rev-box').style.display = 'block';
-    $('rev-txt').textContent = '💖 REVIVIENDO A ' + fallen.n.toUpperCase() + '... ' + revTimer.toFixed(1) + 's';
-    $('rev-bar').style.width = pct + '%';
-
-    if (revTimer <= 0 && R) {
-      resetRevive();
-      R.presence({ reviveTarget: fallen.u });
-      say('✨ ¡Reviviste a ' + fallen.n + '!', 3);
-      setTimeout(() => { if (R) R.presence({ reviveTarget: '' }); }, 1500);
-    }
-  } else if (revTargetId) {
-    resetRevive();
-  }
+    $('rev-box').style.display = 'none';
+const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
+|| PE.find(p => p.u !== MYID && p.hp > 0 && !p.downed);
+if (mate) {
+spectating = mate;
+me.x = mate.x;
+me.y = mate.y;
+$('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
+// Revisar si algún compañero terminó los 5s encima de mí
+const savior = PE.find(p => p.reviveTarget === MYID);
+if (savior) {
+downed = false;
+me.alive = 1;
+me.hp = Math.round(me.max * 0.6);
+me.x = savior.x + 20;
+me.y = savior.y + 20;
+$('atk').style.display = 'block';
+$('spec-banner').style.display = 'none';
+say('💖 ¡' + savior.n + ' te ha revivido!', 4);
+}
+} else {
+downed = false;
+$('spec-banner').style.display = 'none';
+end(alive().length + 1);
+}
+return;
+}
+// Detección automática al pararse encima (< 45px) sin teclas
+const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 45);
+if (fallen) {
+if (revTargetId !== fallen.u) {
+revTargetId = fallen.u;
+revTimer = 5.0;
+}
+revTimer = Math.max(0, revTimer - 0.1);
+const pct = ((5.0 - revTimer) / 5.0) * 100;
+$('rev-box').style.display = 'block';
+$('rev-txt').textContent = '💖 REVIVIENDO A ' + fallen.n.toUpperCase() + '... ' + revTimer.toFixed(1) + 's';
+$('rev-bar').style.width = pct + '%';
+if (revTimer <= 0) {
+myRevivePing = fallen.u;
+revTimer = 0;
+revTargetId = null;
+$('rev-box').style.display = 'none';
+say('✨ ¡Reviviste a ' + fallen.n + '!', 3);
+setTimeout(() => { myRevivePing = ''; }, 2000);
+}
+} else {
+revTimer = 0;
+revTargetId = null;
+$('rev-box').style.display = 'none';
+}
 }, 100);
 go('menu');
 </script>
