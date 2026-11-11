@@ -1148,21 +1148,43 @@ Object.assign(SPR, {
     '..kkk......kkk..........'
   ]
 });
-/* === BLOQUE 3: MOTOR RENDERIZADOR EXACTO (1 LETRA = 1 PÍXEL) === */
+/* === BLOQUE 3: AUTO-CENTRADO DE SILUETA Y REALCE DE COLORES === */
+document.head.insertAdjacentHTML('beforeend', '<style>.scr{padding-top:68px !important}#menu{padding-top:52px !important}</style>');
+
 drawSpr0 = function(g, mn, x, y, px, sc) {
   const A = SPR[mn];
   if (!A) return;
-  const N = A.length;
-  const W = Math.max(...A.map(r => r.length));
-  const step = (12 * px) / Math.max(N, W);
+
+  // 1. Detectar los límites reales del dibujo (ignorar espacios vacíos '.')
+  let minX = 99, maxX = -1, minY = 99, maxY = -1;
+  for (let j = 0; j < A.length; j++) {
+    const row = A[j] || '';
+    for (let i = 0; i < row.length; i++) {
+      if (row[i] && row[i] !== '.') {
+        if (i < minX) minX = i;
+        if (i > maxX) maxX = i;
+        if (j < minY) minY = j;
+        if (j > maxY) maxY = j;
+      }
+    }
+  }
+  if (maxX < minX) return;
+
+  const realW = maxX - minX + 1;
+  const realH = maxY - minY + 1;
+  const box = 12 * px;
+  const step = Math.max(1, (box * 0.86) / Math.max(realW, realH));
+  const ox = x + (box - realW * step) / 2;
+  const oy = y + (box - realH * step) / 2;
+
   const rb = sc === 'rainbow';
   const bc = rb ? RB() : sc;
 
   g.save();
   g.imageSmoothingEnabled = false;
-  for (let j = 0; j < N; j++) {
+  for (let j = minY; j <= maxY; j++) {
     const row = A[j] || '';
-    for (let i = 0; i < row.length; i++) {
+    for (let i = minX; i <= maxX; i++) {
       const ch = row[i];
       if (!ch || ch === '.') continue;
       let col = PL[ch] || bc || MON[mn].c;
@@ -1173,7 +1195,12 @@ drawSpr0 = function(g, mn, x, y, px, sc) {
         col = bc;
       }
       g.fillStyle = col;
-      g.fillRect(Math.floor(x + i * step), Math.floor(y + j * step), Math.ceil(step), Math.ceil(step));
+      g.fillRect(
+        Math.round(ox + (i - minX) * step),
+        Math.round(oy + (j - minY) * step),
+        Math.ceil(step),
+        Math.ceil(step)
+      );
     }
   }
   g.restore();
