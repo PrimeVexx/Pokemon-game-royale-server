@@ -1205,6 +1205,140 @@ drawSpr0 = function(g, mn, x, y, px, sc) {
   }
   g.restore();
 };
+  /* 3. MODO ESPECTADOR Y REVIVIR AUTOMÁTICO AL PARARSE ENCIMA (5 SEGUNDOS) */
+let downed = false;
+let spectating = null;
+let revTimer = 0;
+let revTargetId = null;
+
+document.body.insertAdjacentHTML('beforeend', `
+  <div id="rev-box" style="position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:12;background:#000d;border:2px solid #4cd964;border-radius:10px;padding:10px 18px;text-align:center;display:none;min-width:190px;pointer-events:none">
+    <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
+    <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
+      <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
+    </div>
+  </div>
+`);
+
+const _hitOrig = hit;
+hit = function(f, d, by) {
+  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive) {
+    const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
+    if (aliveMates.length > 0) {
+      f.hp = 1;
+      f.alive = 0;
+      downed = true;
+      spectating = aliveMates[0];
+      $('atk').style.display = 'none';
+      $('spec-banner').style.display = 'block';
+      say('💀 ¡Caíste! Espectando a ' + spectating.n + '...', 4);
+      if (R) R.presence({ hp: 0, downed: 1, dx: Math.round(f.x), dy: Math.round(f.y) });
+      return;
+    }
+  }
+  _hitOrig(f, d, by);
+};
+
+function resetRevive() {
+  revTimer = 0;
+  revTargetId = null;
+  $('rev-box').style.display = 'none';
+}
+
+// Dibujar el círculo verde en el suelo donde cayó el compañero
+const _drawOrig = draw;
+draw = function() {
+  _drawOrig();
+  if (!G || G.over) return;
+  const me = G.f[0];
+  const sc = Math.min(1.2, Math.max(0.7, w / 700));
+  PE.forEach(p => {
+    if (p.u !== MYID && p.downed && p.dx != null) {
+      const sx = w / 2 + (p.dx - me.x) * sc;
+      const sy = h / 2 + (p.dy - me.y) * sc;
+      cx.save();
+      cx.strokeStyle = '#4cd964';
+      cx.lineWidth = 3;
+      cx.setLineDash([8, 6]);
+      cx.beginPath();
+      cx.arc(sx, sy, 32 * sc, 0, 7);
+      cx.stroke();
+      cx.setLineDash([]);
+      cx.fillStyle = '#4cd964';
+      cx.font = 'bold 12px sans-serif';
+      cx.textAlign = 'center';
+      cx.fillText('➕ ' + p.n, sx, sy - 38 * sc);
+      cx.restore();
+    }
+  });
+};
+
+// Revisar cada 0.1s si estás espectando o parado encima de un compañero caído
+setInterval(() => {
+  if (!G || G.over) {
+    $('spec-banner').style.display = 'none';
+    resetRevive();
+    downed = false;
+    return;
+  }
+
+  const me = G.f[0];
+
+  // Si estás caído espectando
+  if (downed) {
+    resetRevive();
+    const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
+              || PE.find(p => p.u !== MYID && p.hp > 0 && !p.downed);
+
+    if (mate) {
+      spectating = mate;
+      me.x = mate.x;
+      me.y = mate.y;
+      $('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
+
+      if (mate.reviveTarget === MYID) {
+        downed = false;
+        me.alive = 1;
+        me.hp = Math.round(me.max * 0.6);
+        me.x = mate.x + 25;
+        me.y = mate.y + 25;
+        $('atk').style.display = 'block';
+        $('spec-banner').style.display = 'none';
+        say('💖 ¡' + mate.n + ' te ha revivido!', 4);
+        if (R) R.presence({ hp: me.hp, downed: 0 });
+      }
+    } else {
+      downed = false;
+      $('spec-banner').style.display = 'none';
+      end(alive().length + 1);
+    }
+    return;
+  }
+
+  // Si estás vivo, detectar automáticamente si estás parado encima (< 42 píxeles)
+  const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 42);
+
+  if (fallen) {
+    if (revTargetId !== fallen.u) {
+      revTargetId = fallen.u;
+      revTimer = 5.0;
+    }
+    revTimer = Math.max(0, revTimer - 0.1);
+    const pct = ((5.0 - revTimer) / 5.0) * 100;
+    $('rev-box').style.display = 'block';
+    $('rev-txt').textContent = '💖 REVIVIENDO A ' + fallen.n.toUpperCase() + '... ' + revTimer.toFixed(1) + 's';
+    $('rev-bar').style.width = pct + '%';
+
+    if (revTimer <= 0 && R) {
+      resetRevive();
+      R.presence({ reviveTarget: fallen.u });
+      say('✨ ¡Reviviste a ' + fallen.n + '!', 3);
+      setTimeout(() => { if (R) R.presence({ reviveTarget: '' }); }, 1500);
+    }
+  } else if (revTargetId) {
+    resetRevive();
+  }
+}, 100);
 go('menu');
 </script>
 <script src="config.js"></script>
