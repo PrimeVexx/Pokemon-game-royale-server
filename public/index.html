@@ -1247,8 +1247,28 @@ document.body.insertAdjacentHTML('beforeend', `
     </div>
   </div>
 `);
+/* === PARTE 1: ESTILOS LOBBY Y AVISOS DE RESCATE === */
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+  .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
+  .ps-mate canvas { width:150px; height:165px; image-rendering:pixelated; }
+  .ps-ped { width:130px; height:18px; margin-top:-12px; border-radius:50%; background:radial-gradient(#4fc3ff, #2bf8 55%, transparent 72%); }
+  .ps-tag { background:#000b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-bottom:2px; border:1px solid #4fc3ff88; }
+  #spec-banner { position:fixed; top:55px; left:50%; transform:translateX(-50%); z-index:10; background:#000c; border:2px solid #4fc3ff; color:#fff; padding:6px 16px; border-radius:8px; font-weight:800; font-size:13px; display:none; text-align:center; pointer-events:none; }
+  #rev-box { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:12; background:#000d; border:2px solid #4cd964; border-radius:10px; padding:10px 18px; text-align:center; display:none; min-width:190px; pointer-events:none; }
+</style>
+`);
 
-/* 1. LOBBY ESTILO FORTNITE */
+document.body.insertAdjacentHTML('beforeend', `
+  <div id="spec-banner">👀 ESPECTANDO A TU COMPAÑERO · Esperando que te reviva...</div>
+  <div id="rev-box">
+    <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
+    <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
+      <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
+    </div>
+  </div>
+`);
+
 slots = function() {
   const el = $('slots');
   if (!el) return;
@@ -1290,8 +1310,7 @@ slots = function() {
   });
 };
 setInterval(slots, 500);
-
-/* 2. CONSERVAR AVIÓN, HORDA Y RAYQUAZA + SINCRONIZAR 15 ENEMIGOS EN TODO EL MAPA */
+/* === PARTE 2: HORDA Y RAYQUAZA INTACTOS + 15 ENEMIGOS EN TODO EL MAPA (BR) === */
 let MATCH_SEED = 123456;
 function seededRng(seed) {
   let s = (seed || 123456) % 2147483647;
@@ -1299,11 +1318,11 @@ function seededRng(seed) {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-const ALL_REGIONS = [,   // Pallet Town,  // Mt. Moon,  // Cerulean City,  // Viridian Forest Norte,  // Viridian Forest Sur, // Pokémon League Centro, // Rock Tunnel, // Safari Zone, // Lago Sur,  // Cinnabar Island,  // Llanura Oeste,  // Llanura Este, // Valle Suroeste, // Valle Sureste
-  [1400, 950]   // Meseta Central
+const ALL_REGIONS = [, [1350, 400], [2150, 450], [700, 1100], [700, 1450],
+, [1950, 1200], [2050, 1900], [1400, 1950], [620, 2300],
+, [1750, 850], [1050, 1650], [1750, 1600], [1400, 1000]
 ];
 
-// Envolver start() sin romper el avión ni los modos Horda/Rayquaza
 const _origStart = start;
 start = function() {
   _origStart();
@@ -1314,39 +1333,39 @@ start = function() {
   $('rev-box').style.display = 'none';
   $('spec-banner').style.display = 'none';
 
-  // Si estamos en Battle Royale, sincronizar los 15 enemigos y cofres con la semilla del grupo
-  const rng = seededRng(MATCH_SEED);
-  const names = NAMES.slice().sort(() => rng() - 0.5);
-  const ks = Object.keys(MON).filter(k => !MON[k].pass);
+  if (S.mode === 'br') {
+    const rng = seededRng(MATCH_SEED);
+    const names = NAMES.slice().sort(() => rng() - 0.5);
+    const ks = Object.keys(MON).filter(k => !MON[k].pass);
 
-  // Asegurar que haya exactamente 15 enemigos repartidos por todo el mapa cuando salten del avión
-  for (let i = 1; i < G.f.length; i++) {
-    const monName = ks[Math.floor(rng() * ks.length)];
-    const m = MON[monName];
-    const spot = ALL_REGIONS[(i - 1) % ALL_REGIONS.length];
-    G.f[i].mn = monName;
-    G.f[i].m = m;
-    G.f[i].n = names[i % names.length];
-    G.f[i].hp = G.f[i].max = m.hp * 0.85;
-    G.f[i].tx = spot[0] + (rng() - 0.5) * 120;
-    G.f[i].ty = spot[1] + (rng() - 0.5) * 120;
-    G.f[i].jt = 1.5 + ((i * 0.9) % 13.5); // Saltan escalonados a lo largo de toda la ruta del avión
-  }
+    for (let i = 1; i < G.f.length; i++) {
+      const monName = ks[Math.floor(rng() * ks.length)];
+      const m = MON[monName];
+      const spot = ALL_REGIONS[(i - 1) % ALL_REGIONS.length];
+      G.f[i].mn = monName;
+      G.f[i].m = m;
+      G.f[i].n = names[i % names.length];
+      G.f[i].hp = G.f[i].max = m.hp * 0.85;
+      G.f[i].tx = spot[0] + (rng() - 0.5) * 120;
+      G.f[i].ty = spot[1] + (rng() - 0.5) * 120;
+      G.f[i].jt = 1.5 + ((i * 0.9) % 13.5);
+    }
 
-  // Sincronizar las posiciones de los cofres para todo el grupo
-  for (let i = 0; i < G.ch.length; i++) {
-    const reg = ALL_REGIONS[i % ALL_REGIONS.length];
-    G.ch[i].x = Math.max(80, Math.min(WD - 80, reg[0] + (rng() - 0.5) * 450));
-    G.ch[i].y = Math.max(80, Math.min(WD - 80, reg[1] + (rng() - 0.5) * 450));
+    for (let i = 0; i < G.ch.length; i++) {
+      const reg = ALL_REGIONS[i % ALL_REGIONS.length];
+      G.ch[i].x = Math.max(80, Math.min(WD - 80, reg[0] + (rng() - 0.5) * 450));
+      G.ch[i].y = Math.max(80, Math.min(WD - 80, reg[1] + (rng() - 0.5) * 450));
+    }
   }
 };
 
-// Evitar que al saltar del avión el código original sobreescriba el destino asignado por región
 const _origUpd = upd;
 upd = function(dt) {
-  const savedTargets = G && G.f ? G.f.map(f => ({ onp: f.onp, tx: f.tx, ty: f.ty })) : [];
+  const savedTargets = (G && G.mode !== 'h' && !G.rq && G.f)
+    ? G.f.map(f => ({ onp: f.onp, tx: f.tx, ty: f.ty }))
+    : [];
   _origUpd(dt);
-  if (G && G.f) {
+  if (G && G.mode !== 'h' && !G.rq && G.f) {
     for (let i = 1; i < G.f.length; i++) {
       if (savedTargets[i] && savedTargets[i].onp && !G.f[i].onp) {
         G.f[i].tx = savedTargets[i].tx;
@@ -1356,8 +1375,11 @@ upd = function(dt) {
   }
 };
 
-/* 3. ENTRAR JUNTOS A TODOS LOS MODOS (BR, HORDA ZOMBIE Y EVENTO RAYQUAZA) */
+let myGoTs = 0;
+let myGoMode = 'br';
+
 function launchGroupMode(mode, seed) {
+  if (QT) { clearInterval(QT); QT = null; }
   S.mode = mode || 'br';
   MATCH_SEED = seed || MATCH_SEED;
   menu();
@@ -1368,9 +1390,15 @@ function launchGroupMode(mode, seed) {
 
 $('play').onclick = () => {
   MATCH_SEED = Math.floor(100000 + Math.random() * 899999);
+  myGoTs = Date.now();
+  myGoMode = S.mode;
+  lastgo = myGoTs;
   if (R) {
-    lastgo = Date.now();
-    R.presence({ go: lastgo, mode: S.mode, seed: MATCH_SEED, downed: 0, reviveTarget: '' });
+    R.presence({
+      n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
+      go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
+      downed: 0, reviveTarget: ''
+    });
   }
   launchGroupMode(S.mode, MATCH_SEED);
 };
@@ -1383,7 +1411,7 @@ pj = async function(c) {
     if (R) await R.leave();
     R = await R0.join('PR-' + c);
     $('pc').textContent = c;
-    R.presence({ n: MYN, mn: S.sel, skin: S.skin || '', u: MYID, downed: 0, reviveTarget: '' });
+    R.presence({ n: MYN, mn: S.sel, skin: S.skin || '', u: MYID, go: 0, downed: 0, reviveTarget: '' });
     R.onPeers(() => {
       const ps = R.peers();
       PE = ps.map(p => p.presence).filter(p => p && p.u && p.u !== MYID);
@@ -1392,7 +1420,7 @@ pj = async function(c) {
         : 'Comparte el código ' + c + ' con tus amigos…';
       slots();
 
-      const starter = PE.find(p => p.go && p.go > lastgo && Date.now() - p.go < 8000);
+      const starter = PE.find(p => p.go && p.go > lastgo && Date.now() - p.go < 10000);
       if (starter) {
         lastgo = starter.go;
         launchGroupMode(starter.mode || 'br', starter.seed || 123456);
@@ -1404,8 +1432,7 @@ pj = async function(c) {
 };
 $('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase());
 $('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase()); };
-
-/* 4. MODO ESPECTADOR Y REVIVIR AUTOMÁTICO ENCIMA (5 SEGUNDOS) */
+/* === PARTE 3: MODO ESPECTADOR Y RESCATE AUTOMÁTICO EN 5 SEGUNDOS === */
 let downed = false;
 let spectating = null;
 let revTimer = 0;
@@ -1424,7 +1451,6 @@ hit = function(f, d, by) {
       $('atk').style.display = 'none';
       $('spec-banner').style.display = 'block';
       say('💀 ¡Caíste! Espectando a ' + spectating.n + '...', 4);
-      if (R) R.presence({ hp: 0, downed: 1, dx: Math.round(f.x), dy: Math.round(f.y) });
       return;
     }
   }
@@ -1465,6 +1491,13 @@ setInterval(() => {
     downed = false;
     revTimer = 0;
     revTargetId = null;
+    if (R) {
+      R.presence({
+        n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
+        go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
+        hp: 0, downed: 0, reviveTarget: ''
+      });
+    }
     return;
   }
 
@@ -1482,6 +1515,9 @@ setInterval(() => {
       mn: me.mn,
       n: MYN,
       u: MYID,
+      go: myGoTs,
+      mode: myGoMode,
+      seed: MATCH_SEED,
       downed: downed ? 1 : 0,
       dx: downed ? Math.round(me.x) : null,
       dy: downed ? Math.round(me.y) : null,
@@ -1499,48 +1535,51 @@ setInterval(() => {
       me.x = mate.x;
       me.y = mate.y;
       $('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
+
       const savior = PE.find(p => p.reviveTarget === MYID);
-if (savior) {
-downed = false;
-me.alive = 1;
-me.hp = Math.round(me.max * 0.6);
-me.x = savior.x + 20;
-me.y = savior.y + 20;
-$('atk').style.display = 'block';
-$('spec-banner').style.display = 'none';
-say('💖 ¡' + savior.n + ' te ha revivido!', 4);
-}
-} else {
-downed = false;
-$('spec-banner').style.display = 'none';
-end(alive().length + 1);
-}
-return;
-}
-const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 45);
-if (fallen) {
-if (revTargetId !== fallen.u) {
-revTargetId = fallen.u;
-revTimer = 5.0;
-}
-revTimer = Math.max(0, revTimer - 0.1);
-const pct = ((5.0 - revTimer) / 5.0) * 100;
-$('rev-box').style.display = 'block';
-$('rev-txt').textContent = '💖 REVIVIENDO A ' + fallen.n.toUpperCase() + '... ' + revTimer.toFixed(1) + 's';
-$('rev-bar').style.width = pct + '%';
-if (revTimer <= 0) {
-myRevivePing = fallen.u;
-revTimer = 0;
-revTargetId = null;
-$('rev-box').style.display = 'none';
-say('✨ ¡Reviviste a ' + fallen.n + '!', 3);
-setTimeout(() => { myRevivePing = ''; }, 2000);
-}
-} else {
-revTimer = 0;
-revTargetId = null;
-$('rev-box').style.display = 'none';
-}
+      if (savior) {
+        downed = false;
+        me.alive = 1;
+        me.hp = Math.round(me.max * 0.6);
+        me.x = savior.x + 20;
+        me.y = savior.y + 20;
+        $('atk').style.display = 'block';
+        $('spec-banner').style.display = 'none';
+        say('💖 ¡' + savior.n + ' te ha revivido!', 4);
+      }
+    } else {
+      downed = false;
+      $('spec-banner').style.display = 'none';
+      end(alive().length + 1);
+    }
+    return;
+  }
+
+  const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 45);
+  if (fallen) {
+    if (revTargetId !== fallen.u) {
+      revTargetId = fallen.u;
+      revTimer = 5.0;
+    }
+    revTimer = Math.max(0, revTimer - 0.1);
+    const pct = ((5.0 - revTimer) / 5.0) * 100;
+    $('rev-box').style.display = 'block';
+    $('rev-txt').textContent = '💖 REVIVIENDO A ' + fallen.n.toUpperCase() + '... ' + revTimer.toFixed(1) + 's';
+    $('rev-bar').style.width = pct + '%';
+
+    if (revTimer <= 0) {
+      myRevivePing = fallen.u;
+      revTimer = 0;
+      revTargetId = null;
+      $('rev-box').style.display = 'none';
+      say('✨ ¡Reviviste a ' + fallen.n + '!', 3);
+      setTimeout(() => { myRevivePing = ''; }, 2000);
+    }
+  } else {
+    revTimer = 0;
+    revTargetId = null;
+    $('rev-box').style.display = 'none';
+  }
 }, 100);
 go('menu');
 </script>
