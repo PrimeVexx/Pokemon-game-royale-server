@@ -1226,6 +1226,27 @@ document.body.insertAdjacentHTML('beforeend', `
     </div>
   </div>
 `);
+/* === MULTIJUGADOR SINCRONIZADO, AVIÓN INTACTO, HORDA/RAYQUAZA Y REVIVIR 5S === */
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+  .ps-mate { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
+  .ps-mate canvas { width:150px; height:165px; image-rendering:pixelated; }
+  .ps-ped { width:130px; height:18px; margin-top:-12px; border-radius:50%; background:radial-gradient(#4fc3ff, #2bf8 55%, transparent 72%); }
+  .ps-tag { background:#000b; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-bottom:2px; border:1px solid #4fc3ff88; }
+  #spec-banner { position:fixed; top:55px; left:50%; transform:translateX(-50%); z-index:10; background:#000c; border:2px solid #4fc3ff; color:#fff; padding:6px 16px; border-radius:8px; font-weight:800; font-size:13px; display:none; text-align:center; pointer-events:none; }
+  #rev-box { position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); z-index:12; background:#000d; border:2px solid #4cd964; border-radius:10px; padding:10px 18px; text-align:center; display:none; min-width:190px; pointer-events:none; }
+</style>
+`);
+
+document.body.insertAdjacentHTML('beforeend', `
+  <div id="spec-banner">👀 ESPECTANDO A TU COMPAÑERO · Esperando que te reviva...</div>
+  <div id="rev-box">
+    <div id="rev-txt" style="font-weight:900;font-size:14px;color:#4cd964;margin-bottom:6px">REVIVIENDO... 5.0s</div>
+    <div style="width:100%;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden">
+      <div id="rev-bar" style="width:0%;height:100%;background:#4cd964"></div>
+    </div>
+  </div>
+`);
 
 /* 1. LOBBY ESTILO FORTNITE */
 slots = function() {
@@ -1270,73 +1291,72 @@ slots = function() {
 };
 setInterval(slots, 500);
 
-/* 2. SEMILLA COMPARTIDA Y 15 PUNTOS REPARTIDOS POR TODO EL MAPA */
-let MATCH_SEED = Date.now() % 2147483647;
+/* 2. CONSERVAR AVIÓN, HORDA Y RAYQUAZA + SINCRONIZAR 15 ENEMIGOS EN TODO EL MAPA */
+let MATCH_SEED = 123456;
 function seededRng(seed) {
-  let s = (seed || 12345) % 2147483647;
+  let s = (seed || 123456) % 2147483647;
   if (s <= 0) s += 2147483646;
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-// 15 ubicaciones estratégicas cubriendo cada región del mapa (2800x2800)
-const MAP_SPAWNS = [,   // Pallet Town,  // Mt. Moon,  // Cerulean City,  // Viridian Forest Norte,  // Viridian Forest Sur, // Pokémon League Centro, // Rock Tunnel, // Safari Zone, // Lago Sur,  // Cinnabar Island,  // Llanura Oeste,  // Llanura Este, // Costa Suroeste, // Costa Sureste
+const ALL_REGIONS = [,   // Pallet Town,  // Mt. Moon,  // Cerulean City,  // Viridian Forest Norte,  // Viridian Forest Sur, // Pokémon League Centro, // Rock Tunnel, // Safari Zone, // Lago Sur,  // Cinnabar Island,  // Llanura Oeste,  // Llanura Este, // Valle Suroeste, // Valle Sureste
   [1400, 950]   // Meseta Central
 ];
 
-// Sobrescribir start() para que ambos jugadores generen exactamente los mismos 15 enemigos y posiciones
+// Envolver start() sin romper el avión ni los modos Horda/Rayquaza
+const _origStart = start;
 start = function() {
-  const rng = seededRng(MATCH_SEED);
-  const names = NAMES.slice().sort(() => rng() - 0.5);
-  const ks = Object.keys(MON).filter(k => !MON[k].pass);
-  const sk = SK[S.skin] && (!SK[S.skin].only || SK[S.skin].only == S.sel) ? S.skin : '';
-
-  const peersInGroup = PE.filter(p => p && p.u && p.u !== MYID);
-  const botCount = Math.max(1, 14 - peersInGroup.length);
-
-  G = { f: [mk(S.sel, MYN || 'Tú', 0, sk)], p: [], ch: [], T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
-
-  // Ubicar al jugador local en el primer spawn de la semilla
-  const mySpot = MAP_SPAWNS[Math.floor(rng() * MAP_SPAWNS.length)];
-  G.f[0].x = mySpot[0];
-  G.f[0].y = mySpot[1];
-
-  // Crear los bots deterministas repartidos en las 15 zonas del mapa
-  for (let i = 0; i < botCount; i++) {
-    const monName = ks[Math.floor(rng() * ks.length)];
-    const bot = mk(monName, names[i % names.length], 1, '');
-    const spot = MAP_SPAWNS[(i + 1) % MAP_SPAWNS.length];
-    bot.x = spot[0] + (rng() - 0.5) * 80;
-    bot.y = spot[1] + (rng() - 0.5) * 80;
-    bot.tx = spot[0];
-    bot.ty = spot[1];
-    G.f.push(bot);
-  }
-
-  // Generar los 70 cofres en las mismas coordenadas para todo el grupo
-  for (let i = 0; i < 70; i++) {
-    let cxp = 120 + rng() * (WD - 240);
-    let cyp = 120 + rng() * (WD - 240);
-    G.ch.push({ x: cxp, y: cyp });
-  }
-
-  G.f.forEach((f, idx) => {
-    f.onp = 1;
-    f.air = 0;
-    f.jt = 1.5 + ((idx * 1.7) % 12);
-  });
-
+  _origStart();
   downed = false;
   spectating = null;
   revTimer = 0;
   revTargetId = null;
   $('rev-box').style.display = 'none';
   $('spec-banner').style.display = 'none';
-  $('atk').style.display = 'block';
-  ['menu', 'shop', 'end', 'inv', 'modes', 'fr'].forEach(s => $(s).classList.remove('on'));
-  say('✈️ Pulsa SALTAR para caer en el mapa (15 enemigos activos)', 5);
+
+  // Si estamos en Battle Royale, sincronizar los 15 enemigos y cofres con la semilla del grupo
+  const rng = seededRng(MATCH_SEED);
+  const names = NAMES.slice().sort(() => rng() - 0.5);
+  const ks = Object.keys(MON).filter(k => !MON[k].pass);
+
+  // Asegurar que haya exactamente 15 enemigos repartidos por todo el mapa cuando salten del avión
+  for (let i = 1; i < G.f.length; i++) {
+    const monName = ks[Math.floor(rng() * ks.length)];
+    const m = MON[monName];
+    const spot = ALL_REGIONS[(i - 1) % ALL_REGIONS.length];
+    G.f[i].mn = monName;
+    G.f[i].m = m;
+    G.f[i].n = names[i % names.length];
+    G.f[i].hp = G.f[i].max = m.hp * 0.85;
+    G.f[i].tx = spot[0] + (rng() - 0.5) * 120;
+    G.f[i].ty = spot[1] + (rng() - 0.5) * 120;
+    G.f[i].jt = 1.5 + ((i * 0.9) % 13.5); // Saltan escalonados a lo largo de toda la ruta del avión
+  }
+
+  // Sincronizar las posiciones de los cofres para todo el grupo
+  for (let i = 0; i < G.ch.length; i++) {
+    const reg = ALL_REGIONS[i % ALL_REGIONS.length];
+    G.ch[i].x = Math.max(80, Math.min(WD - 80, reg[0] + (rng() - 0.5) * 450));
+    G.ch[i].y = Math.max(80, Math.min(WD - 80, reg[1] + (rng() - 0.5) * 450));
+  }
 };
 
-/* 3. SINCRONIZACIÓN DE GRUPO PARA ENTRAR JUNTOS A CUALQUIER MODO */
+// Evitar que al saltar del avión el código original sobreescriba el destino asignado por región
+const _origUpd = upd;
+upd = function(dt) {
+  const savedTargets = G && G.f ? G.f.map(f => ({ onp: f.onp, tx: f.tx, ty: f.ty })) : [];
+  _origUpd(dt);
+  if (G && G.f) {
+    for (let i = 1; i < G.f.length; i++) {
+      if (savedTargets[i] && savedTargets[i].onp && !G.f[i].onp) {
+        G.f[i].tx = savedTargets[i].tx;
+        G.f[i].ty = savedTargets[i].ty;
+      }
+    }
+  }
+};
+
+/* 3. ENTRAR JUNTOS A TODOS LOS MODOS (BR, HORDA ZOMBIE Y EVENTO RAYQUAZA) */
 function launchGroupMode(mode, seed) {
   S.mode = mode || 'br';
   MATCH_SEED = seed || MATCH_SEED;
@@ -1355,7 +1375,6 @@ $('play').onclick = () => {
   launchGroupMode(S.mode, MATCH_SEED);
 };
 
-// Reemplazar pj para escuchar cambios de grupo y arranque en todos los modos
 pj = async function(c) {
   $('pc').textContent = c;
   if (!R0) { try { R0 = await claude.use('room'); } catch (e) {} }
@@ -1376,7 +1395,7 @@ pj = async function(c) {
       const starter = PE.find(p => p.go && p.go > lastgo && Date.now() - p.go < 8000);
       if (starter) {
         lastgo = starter.go;
-        launchGroupMode(starter.mode || 'br', starter.seed || 12345);
+        launchGroupMode(starter.mode || 'br', starter.seed || 123456);
       }
     });
   } catch (e) {
@@ -1386,7 +1405,7 @@ pj = async function(c) {
 $('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase());
 $('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase()); };
 
-/* 4. ESPECTAR Y REVIVIR AUTOMÁTICO AL PARARSE ENCIMA (5 SEGUNDOS) */
+/* 4. MODO ESPECTADOR Y REVIVIR AUTOMÁTICO ENCIMA (5 SEGUNDOS) */
 let downed = false;
 let spectating = null;
 let revTimer = 0;
@@ -1395,7 +1414,7 @@ let myRevivePing = '';
 
 const _hitOrig = hit;
 hit = function(f, d, by) {
-  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive && !downed) {
+  if (!f.bot && G && G.mode !== 'h' && !G.rq && f.hp - d <= 0 && f.alive && !downed) {
     const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
     if (aliveMates.length > 0) {
       f.hp = 1;
@@ -1412,7 +1431,6 @@ hit = function(f, d, by) {
   _hitOrig(f, d, by);
 };
 
-// Dibujar el círculo verde de rescate en el suelo
 const _drawOrig = draw;
 draw = function() {
   _drawOrig();
@@ -1440,7 +1458,6 @@ draw = function() {
   });
 };
 
-// Bucle de sincronización y conteo automático de 5s integrado
 setInterval(() => {
   if (!G || G.over) {
     $('spec-banner').style.display = 'none';
@@ -1453,7 +1470,6 @@ setInterval(() => {
 
   const me = G.f[0];
 
-  // Enviar estado completo sin borrar downed ni reviveTarget
   if (R) {
     R.presence({
       x: Math.round(me.x),
@@ -1473,18 +1489,17 @@ setInterval(() => {
     });
   }
 
-  // Modo espectador si estoy abatido
   if (downed) {
     $('rev-box').style.display = 'none';
-const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
-|| PE.find(p => p.u !== MYID && p.hp > 0 && !p.downed);
-if (mate) {
-spectating = mate;
-me.x = mate.x;
-me.y = mate.y;
-$('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
-// Revisar si algún compañero terminó los 5s encima de mí
-const savior = PE.find(p => p.reviveTarget === MYID);
+    const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
+              || PE.find(p => p.u !== MYID && p.hp > 0 && !p.downed);
+
+    if (mate) {
+      spectating = mate;
+      me.x = mate.x;
+      me.y = mate.y;
+      $('spec-banner').textContent = '👀 ESPECTANDO A ' + mate.n.toUpperCase() + ' · Esperando revivir...';
+      const savior = PE.find(p => p.reviveTarget === MYID);
 if (savior) {
 downed = false;
 me.alive = 1;
@@ -1502,7 +1517,6 @@ end(alive().length + 1);
 }
 return;
 }
-// Detección automática al pararse encima (< 45px) sin teclas
 const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 45);
 if (fallen) {
 if (revTargetId !== fallen.u) {
