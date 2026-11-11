@@ -1505,16 +1505,18 @@ pj = async function(c, creator = false) {
 };
 $('pnew').onclick = () => pj(Math.random().toString(36).slice(2, 6).toUpperCase(), true);
 $('pjoin').onclick = () => { const c = prompt('Código del grupo'); if (c) pj(c.trim().toUpperCase(), false); };
-/* === PARTE 3: TRANSMISIÓN DE BOTS DEL LÍDER + RESCATE AUTOMÁTICO EN 5S === */
+/* === PARTE 3: REVIVIR EN TODOS LOS MODOS + VICTORIA COMPARTIDA PARA TODO EL GRUPO === */
 let downed = false;
 let spectating = null;
 let revTimer = 0;
 let revTargetId = null;
 let myRevivePing = '';
+let myWinSignal = 0;
 
+// 1. Permitir caer abatido y espectar en TODOS los modos si hay compañeros vivos
 const _hitOrig = hit;
 hit = function(f, d, by) {
-  if (!f.bot && G && G.mode === 'br' && f.hp - d <= 0 && f.alive && !downed) {
+  if (!f.bot && G && f.hp - d <= 0 && f.alive && !downed) {
     const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
     if (aliveMates.length > 0) {
       f.hp = 1;
@@ -1530,6 +1532,24 @@ hit = function(f, d, by) {
   _hitOrig(f, d, by);
 };
 
+// 2. Compartir la victoria en Battle Royale y Evento Rayquaza con todo el grupo
+const _endOrig = end;
+end = function(place) {
+  if (place === 1 && R && !myWinSignal) {
+    myWinSignal = Date.now();
+  }
+  _endOrig(place);
+};
+
+const _endRQOrig = endRQ;
+endRQ = function(win) {
+  if (win && R && !myWinSignal) {
+    myWinSignal = Date.now();
+  }
+  _endRQOrig(win);
+};
+
+// 3. Dibujar círculo verde de rescate en el suelo en cualquier modo
 const _drawOrig = draw;
 draw = function() {
   _drawOrig();
@@ -1557,6 +1577,7 @@ draw = function() {
   });
 };
 
+// 4. Bucle principal de sincronización, victoria compartida y rescate de 5s
 setInterval(() => {
   if (!G || G.over) {
     $('spec-banner').style.display = 'none';
@@ -1568,8 +1589,11 @@ setInterval(() => {
       R.presence({
         n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
         leader: isLeader ? 1 : 0, go: myGoTs, mode: S.mode, seed: MATCH_SEED,
-        hp: 0, downed: 0, reviveTarget: ''
+        hp: 0, downed: 0, reviveTarget: '', groupWin: myWinSignal
       });
+    }
+    if (G && G.over && myWinSignal && Date.now() - myWinSignal > 4000) {
+      myWinSignal = 0;
     }
     return;
   }
@@ -1603,10 +1627,24 @@ setInterval(() => {
       downed: downed ? 1 : 0,
       dx: downed ? Math.round(me.x) : null,
       dy: downed ? Math.round(me.y) : null,
-      reviveTarget: myRevivePing
+      reviveTarget: myRevivePing,
+      groupWin: myWinSignal
     });
   }
 
+  // Verificar si un compañero de grupo ganó la partida para darnos la victoria a todos
+  const winnerMate = PE.find(p => p.u !== MYID && p.groupWin && Date.now() - p.groupWin < 6000);
+  if (winnerMate && !G.over) {
+    downed = false;
+    $('spec-banner').style.display = 'none';
+    $('rev-box').style.display = 'none';
+    say('🏆 ¡' + winnerMate.n + ' ganó la partida para todo el grupo!', 4);
+    if (G.rq) _endRQOrig(1);
+    else _endOrig(1);
+    return;
+  }
+
+  // Lógica de espectador cuando estás caído en cualquier modo
   if (downed) {
     $('rev-box').style.display = 'none';
     const mate = PE.find(p => p.u === (spectating && spectating.u) && p.hp > 0 && !p.downed)
@@ -1630,13 +1668,17 @@ setInterval(() => {
         say('💖 ¡' + savior.n + ' te ha revivido!', 4);
       }
     } else {
+      // Si todos los compañeros del grupo murieron, terminar según el modo actual
       downed = false;
       $('spec-banner').style.display = 'none';
-      end(alive().length + 1);
+      if (G.rq) _endRQOrig(0);
+      else if (G.mode === 'h') endH();
+      else _endOrig(alive().length + 1);
     }
     return;
   }
 
+  // Detección automática al pararse encima (< 45px) del compañero caído en cualquier modo
   const fallen = PE.find(p => p.u !== MYID && p.downed && Math.hypot((p.dx || p.x) - me.x, (p.dy || p.y) - me.y) < 45);
   if (fallen) {
     if (revTargetId !== fallen.u) {
