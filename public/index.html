@@ -1705,6 +1705,78 @@ setInterval(() => {
     $('rev-box').style.display = 'none';
   }
 }, 100);
+  /* === SOUNDTRACK OFICIAL DE YOUTUBE (POKÉMON ESMERALDA) === */
+const YT_TRACKS = {
+  lobby:  'kYtaoZsFb3I', // Pokemon Emerald Title Screen theme
+  horde:  'EFVIN01jUUU', // Wild Pokémon Battle Theme [Enhanced]
+  battle: 'oTEk4A28Hy4'  // Pokemon Emerald: Rayquaza Theme
+};
+
+// Apagar la música sintetizada antigua para que solo suene YouTube
+SG.lobby.m = SG.lobby.s = SG.lobby.d = [];
+SG.battle.m = SG.battle.s = SG.battle.d = [];
+SG.horde.m = SG.horde.s = SG.horde.d = [];
+
+// Crear reproductor oculto de YouTube
+document.body.insertAdjacentHTML('beforeend', '<div id="yt-bgm" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1"></div>');
+let ytPlayer = null;
+let ytReady = false;
+let currentYtMode = '';
+
+const ytScript = document.createElement('script');
+ytScript.src = 'https://youtube.com';
+document.head.appendChild(ytScript);
+
+window.onYouTubeIframeAPIReady = function() {
+  ytPlayer = new YT.Player('yt-bgm', {
+    height: '1',
+    width: '1',
+    videoId: YT_TRACKS.lobby,
+    playerVars: {
+      autoplay: 1,
+      loop: 1,
+      playlist: YT_TRACKS.lobby,
+      controls: 0,
+      playsinline: 1
+    },
+    events: {
+      onReady: () => {
+        ytReady = true;
+        ytPlayer.setVolume(50);
+        if (!MUTE) ytPlayer.playVideo();
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.ENDED && !MUTE) {
+          ytPlayer.playVideo();
+        }
+      }
+    }
+  });
+};
+
+// Cambiar automáticamente la canción según el modo (Lobby, Batalla/Rayquaza u Horda)
+setInterval(() => {
+  if (!ytReady || !ytPlayer) return;
+  if (MUTE) {
+    if (ytPlayer.getPlayerState() === 1) ytPlayer.pauseVideo();
+    return;
+  }
+  const targetMode = (G && !G.over) ? (G.mode === 'h' && !G.rq ? 'horde' : 'battle') : 'lobby';
+  if (currentYtMode !== targetMode) {
+    currentYtMode = targetMode;
+    const vid = YT_TRACKS[targetMode] || YT_TRACKS.lobby;
+    ytPlayer.loadVideoById({ videoId: vid });
+  } else if (ytPlayer.getPlayerState() !== 1 && ytPlayer.getPlayerState() !== 3) {
+    ytPlayer.playVideo();
+  }
+}, 800);
+
+// Activar audio al primer toque en pantalla (requisito de navegadores y celulares)
+addEventListener('pointerdown', () => {
+  if (ytReady && ytPlayer && !MUTE && ytPlayer.getPlayerState() !== 1) {
+    ytPlayer.playVideo();
+  }
+});
 go('menu');
 </script>
 <script src="config.js"></script>
