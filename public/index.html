@@ -1705,81 +1705,31 @@ setInterval(() => {
     $('rev-box').style.display = 'none';
   }
 }, 100);
-/* === SOUNDTRACK OFICIAL DE YOUTUBE (CORREGIDO Y DESBLOQUEADO) === */
-const YT_TRACKS = {
-  lobby:  'kYtaoZsFb3I', // Pokemon Emerald Title Screen theme
-  horde:  'EFVIN01jUUU', // Wild Pokémon Battle Theme [Enhanced]
-  battle: 'oTEk4A28Hy4'  // Pokemon Emerald: Rayquaza Theme
-};
-
-// Apagar la música sintetizada antigua correctamente
-SG.lobby.m = []; SG.lobby.s = []; SG.lobby.d = [];
-SG.battle.m = []; SG.battle.s = []; SG.battle.d = [];
-SG.horde.m = []; SG.horde.s = []; SG.horde.d = [];
-
-// Crear reproductor válido para Chrome/Android (mínimo 200x200px fuera de pantalla)
-document.body.insertAdjacentHTML('beforeend', '<div id="yt-wrap" style="position:fixed;left:-300px;bottom:0;width:200px;height:200px;pointer-events:none"><div id="yt-bgm"></div></div>');
-let ytPlayer = null;
-let ytReady = false;
-let currentYtMode = 'lobby';
-
-const ytScript = document.createElement('script');
-ytScript.src = 'https://youtube.com';
-document.head.appendChild(ytScript);
-
-window.onYouTubeIframeAPIReady = function() {
-  ytPlayer = new YT.Player('yt-bgm', {
-    height: '200',
-    width: '200',
-    videoId: YT_TRACKS.lobby,
-    playerVars: {
-      autoplay: 1,
-      loop: 1,
-      playlist: YT_TRACKS.lobby,
-      controls: 0,
-      playsinline: 1,
-      origin: location.origin
-    },
-    events: {
-      onReady: () => {
-        ytReady = true;
-        ytPlayer.setVolume(60);
-        if (!MUTE) ytPlayer.playVideo();
-      },
-      onStateChange: (e) => {
-        if (e.data === YT.PlayerState.ENDED && !MUTE) {
-          ytPlayer.playVideo();
-        }
-      },
-      onError: (e) => {
-        // Si un video tiene bloqueo de derechos de autor en webs externas (código 101 o 150)
-        console.warn('YouTube bloqueó este video externo, código:', e.data);
-      }
-    }
-  });
-};
-
-setInterval(() => {
-  if (!ytReady || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
-  if (MUTE) {
-    if (ytPlayer.getPlayerState() === 1) ytPlayer.pauseVideo();
-    return;
-  }
-  const targetMode = (G && !G.over) ? (G.mode === 'h' && !G.rq ? 'horde' : 'battle') : 'lobby';
-  if (currentYtMode !== targetMode) {
-    currentYtMode = targetMode;
-    const vid = YT_TRACKS[targetMode] || YT_TRACKS.lobby;
-    ytPlayer.loadVideoById({ videoId: vid });
-  } else if (ytPlayer.getPlayerState() !== 1 && ytPlayer.getPlayerState() !== 3) {
-    ytPlayer.playVideo();
-  }
-}, 800);
-
-addEventListener('pointerdown', () => {
-  if (ytReady && ytPlayer && typeof ytPlayer.playVideo === 'function' && !MUTE && ytPlayer.getPlayerState() !== 1) {
-    ytPlayer.unMute();
-    ytPlayer.setVolume(60);
-    ytPlayer.playVideo();
+/* === SOUNDTRACK DE POKÉMON ESMERALDA SIMULADO EN 16-BITS (WEB AUDIO) === */
+Object.assign(SG, {
+  // 1. Lobby: Tema de Título de Pokémon Esmeralda (Aventura / Trompetas Hoenn)
+  lobby: {
+    b: 142,
+    w: 0,
+    m: 'G5 . D5 . G5 . A5 . B5 - - . A5 . G5 . F5# . D5 . E5 . F5# . G5 - - . . . A5 . E5 . A5 . B5 . C6 - - . B5 . A5 . G5 . E5 . F5# . G5 . A5 - - . . .'.replace(/F5#/g,'F5').split(' '),
+    s: 'G3 . D3 . G3 . D3 . E3 . B2 . E3 . B2 . C3 . G3 . C3 . G3 . D3 . A3 . D3 . A3 . A2 . E3 . A2 . E3 . B2 . F3 . B2 . F3 . C3 . G3 . C3 . G3 . D3 . A3 . D3 .'.split(' '),
+    d: 'k . h . s . h . k . h k s . h . k . h . s . h . k . h k s . s .'.split(' ')
+  },
+  // 2. Horda Zombie: Batalla Pokémon Salvaje (Rápido, tenso y con bajo marcado)
+  horde: {
+    b: 176,
+    w: 1,
+    m: 'E5 D5 C5 B4 A4 G4 F4 E4 E5 . E5 . F5 . E5 . D5 C5 B4 A4 G4 F4 E4 D4 C5 . C5 . D5 . C5 . B4 . E5 . G5# . E5 . A5 . E5 . C6 . B5 . A5 . G5 . F5 . E5 . D5 . C5 . B4 .'.replace(/G5#/g,'G5').split(' '),
+    s: 'A2 A2 E3 A2 A2 E3 A2 E3 A2 A2 E3 A2 A2 E3 A2 E3 F2 F2 C3 F2 F2 C3 F2 C3 E2 E2 B2 E2 E2 B2 E2 B2'.split(' '),
+    d: 'k h s h k h s h k h s h k k s s'.split(' ')
+  },
+  // 3. Batalla / Rayquaza: Tema Épico de Rayquaza (Intenso y dramático)
+  battle: {
+    b: 164,
+    w: 2,
+    m: 'D5 - A4 . D5 . F5 . E5 - C5 . A4 - . . D5 - A4 . F5 . G5 . A5 - - . G5 . F5 . E5 - C5 . G5 . F5 . E5 - D5 . C5 . B4 . A4 - E5 . C5# . E5 . D5 - - . . .'.replace(/C5#/g,'C5').split(' '),
+    s: 'D2 D2 A2 D2 D2 A2 D2 A2 C2 C2 G2 C2 C2 G2 C2 G2 A1 A1 E2 A1 A1 E2 A1 E2 D2 D2 A2 D2 D2 A2 D2 A2'.split(' '),
+    d: 'k . s . k k s . k . s . k k s s'.split(' ')
   }
 });
 go('menu');
