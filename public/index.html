@@ -2293,63 +2293,103 @@ requestAnimationFrame(fpsTick);
 setInterval(() => { if (!CFG.qchat && $('qchat-bar')) $('qchat-bar').style.display = 'none'; }, 250);
 
 applySettings();
-	/* === PARCHE FINAL: 10 JUGADORES REALES EN MAPA + VICTORIA SIN CONGELARSE === */
-const VALID_SPOTS = [, [1400, 320], [2400, 400], [450, 1350], [1400, 1400],
-, [400, 2350], [1400, 2400], [2350, 2350], [950, 950]
+/* === CORRECCIÓN LIMPIA: 10 JUGADORES EN MAPA + VICTORIA SIN CONGELAMIENTO === */
+const ZONAS_MAPA = [
+  { x: 450,  y: 450  },
+  { x: 1400, y: 400  },
+  { x: 2350, y: 450  },
+  { x: 500,  y: 1400 },
+  { x: 1400, y: 1400 },
+  { x: 2300, y: 1400 },
+  { x: 450,  y: 2350 },
+  { x: 1400, y: 2350 },
+  { x: 2350, y: 2350 },
+  { x: 1000, y: 950  }
 ];
 
-let winHandled = false;
+let partidaTerminada = false;
 
-// 1. Asegurar 10 participantes exactos (jugadores humanos + bots hasta 10)
-const _fixStart10 = start;
 start = function() {
+  partidaTerminada = false;
   winHandled = false;
   myWinSignal = 0;
-  _fixStart10();
+  downed = false;
+  spectating = null;
+  revTimer = 0;
+  revTargetId = null;
+  $('rev-box').style.display = 'none';
+  $('spec-banner').style.display = 'none';
 
-  if (S.mode === 'br' && G && G.f) {
-    const rng = seededRng(MATCH_SEED);
-    const names = NAMES.slice().sort(() => rng() - 0.5);
-    const ks = Object.keys(MON).filter(k => !MON[k].pass);
-    const mates = PE.filter(p => p && p.u && p.u !== MYID);
-    const neededBots = Math.max(0, 9 - mates.length);
+  const rng = seededRng(MATCH_SEED);
+  const names = NAMES.slice().sort(() => rng() - 0.5);
+  const ks = Object.keys(MON).filter(k => !MON[k].pass);
+  const sk = SK[S.skin] && (!SK[S.skin].only || SK[S.skin].only == S.sel) ? S.skin : '';
 
-    G.f.length = 1;
-    for (let i = 0; i < neededBots; i++) {
-      const monName = ks[Math.floor(rng() * ks.length)];
-      const bot = mk(monName, names[i % names.length], 1, '');
-      const sp = VALID_SPOTS[(i + 1) % VALID_SPOTS.length];
-      bot.onp = 1;
-      bot.air = 0;
-      bot.tx = sp[0] + (rng() - 0.5) * 100;
-      bot.ty = sp[1] + (rng() - 0.5) * 100;
-      bot.jt = 1.5 + ((i * 1.2) % 11);
-      G.f.push(bot);
-    }
+  const mates = PE.filter(p => p && p.u && p.u !== MYID);
+  const totalBots = S.mode === 'br' ? Math.max(0, 9 - mates.length) : 0;
+
+  G = { f: [mk(S.sel, MYN || 'Tú', 0, sk)], p: [], ch: [], T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
+
+  for (let i = 0; i < totalBots; i++) {
+    const monName = ks[Math.floor(rng() * ks.length)];
+    const bot = mk(monName, names[i % names.length], 1, '');
+    const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
+    bot.tx = z.x + Math.round((rng() - 0.5) * 160);
+    bot.ty = z.y + Math.round((rng() - 0.5) * 160);
+    G.f.push(bot);
   }
+
+  for (let i = 0; i < 70; i++) {
+    const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
+    const cxp = Math.max(80, Math.min(WD - 80, z.x + Math.round((rng() - 0.5) * 500)));
+    const cyp = Math.max(80, Math.min(WD - 80, z.y + Math.round((rng() - 0.5) * 500)));
+    G.ch.push({ x: cxp, y: cyp });
+  }
+
+  G.f.forEach((f, idx) => {
+    f.onp = 1;
+    f.air = 0;
+    f.jt = 1.5 + ((idx * 1.1) % 11);
+  });
+
+  if (typeof STORM === 'function' && G.mode === 'br') {
+    G.zx = 1400; G.zy = 1400; G.zr = 1950;
+  }
+
+  $('atk').style.display = 'block';
+  ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp'].forEach(s => {
+    if ($(s)) $(s).classList.remove('on');
+  });
+  say(S.mode === 'br' ? '✈️ ¡10 jugadores en el avión! Pulsa SALTAR' : '⚡ ¡Comienza la batalla!', 4);
 };
 
-// 2. Evitar que la pantalla de victoria se congele en bucle
-const _fixEnd = end;
 end = function(place) {
-  if (winHandled) return;
-  winHandled = true;
+  if (partidaTerminada) return;
+  partidaTerminada = true;
+  if (!G) return;
   G.over = 1;
-  if (place === 1 && R) {
-    myWinSignal = Date.now();
+  mus = 'lobby';
+  mq('g', 1);
+  if (place === 1) {
+    mq('w', 1);
+    if (R) myWinSignal = Date.now();
   }
-  _fixEnd(place);
-};
+  (place === 1 ? [523, 659, 784, 1047, 1319] : [392, 330, 262, 196]).forEach((q, i) => setTimeout(() => snd(q, 0.25, 'square', 0.09), i * 150));
 
-const _fixEndRQ = endRQ;
-endRQ = function(win) {
-  if (winHandled) return;
-  winHandled = true;
-  G.over = 1;
-  if (win && R) {
-    myWinSignal = Date.now();
-  }
-  _fixEndRQ(win);
+  const me = G.f;
+  const win = place === 1;
+  const rw = me.k * 8 + Math.max(0, 11 - place) * 3 + (win ? 30 : 0);
+  S.coins += rw;
+  S.xpt = (S.xpt || 0) + rw * 2;
+  const t = S.st = S.st || {};
+  if (win) t.brw = (t.brw || 0) + 1;
+  t.brk = (t.brk || 0) + me.k;
+  save();
+
+  $('atk').style.display = 'none';
+  $('et').textContent = win ? '🏆 ¡VICTORIA ROYALE!' : 'Puesto #' + place;
+  $('ed').innerHTML = `Eliminaciones: ${me.k}<br>Ganaste <b>${rw} 💰</b> PokeCoins`;
+  setTimeout(() => show('end'), 600);
 };
 go('menu');
 </script>
