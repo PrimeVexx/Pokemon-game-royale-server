@@ -3194,6 +3194,48 @@ tes = function() {
       .replace(/5% \(1 en 20\)|0\.00\d+%|0\.0\d+%|0\.\d+%/g, '0.1% (1 en 1000 Cofre Dorado)');
   }
 };
+	/* === TARJETA DEFINITIVA DE FÚTBOL PENALES EN MODOS === */
+rmodes = function() {
+  const box = $('ml');
+  if (!box) return;
+  box.style.flexWrap = 'wrap';
+  const modos = new Array(
+    { id: 'br', tag: '', title: 'BATTLE ROYALE', sub: 'Grupo · 10 jugadores', desc: 'Salta del avión, abre cofres y sé el último en pie.', mon: 'Pikachu', bg: 'linear-gradient(135deg,#2a3a6a,#1a2342)' },
+    { id: 'h',  tag: '', title: 'HORDA ZOMBIE', sub: 'Infinito · Sobrevive los días', desc: 'Oleadas de zombis cada vez más fuertes. Jefe cada 5 días.', mon: 'Gengar', bg: 'linear-gradient(135deg,#4a206a,#241038)' },
+    { id: 'rq', tag: 'EVENTO', title: 'EVENTO RAYQUAZA', sub: 'Evento · Jefe final · 3:20 min', desc: 'Derrota a Rayquaza antes de que se acabe el tiempo. Raros: Rayquaza 15%, Esmeralda 10% y Arceus Cofre Dorado.', mon: 'Rayquaza', bg: 'linear-gradient(135deg,#186a48,#0d3826)' },
+    { id: 'pen', tag: 'NUEVO', title: '⚽ FÚTBOL PENALES', sub: '1v1 · 5 tiros + 5 paradas', desc: 'Juega contra el bot o contra tu amigo en grupo. ¡Desbloquea Pokémon futbolistas y skins!', mon: 'Cinderace', bg: 'linear-gradient(135deg,#1e6b38,#0d381c)' }
+  );
+  box.innerHTML = modos.map(m => {
+    const sel = S.mode === m.id;
+    return `<div class="mc ${sel ? 'on' : ''}" data-m="${m.id}">
+      <div class="top" style="background:${m.bg}">
+        ${m.tag ? `<span class="tag">${m.tag}</span>` : ''}
+        <canvas id="mico-${m.id}" width="90" height="90"></canvas>
+      </div>
+      <div class="bd">
+        <h3>${m.title}</h3>
+        <small>${m.sub}</small>
+        <p>${m.desc}</p>
+        <button data-sel="${m.id}">${sel ? '✓ SELECCIONADO' : 'ELEGIR'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  modos.forEach(m => {
+    const cv = $('mico-' + m.id);
+    if (cv) drawSpr(cv.getContext('2d'), m.mon, 12, 8, 5.5, null);
+  });
+
+  box.querySelectorAll('[data-sel]').forEach(btn => {
+    btn.onclick = () => {
+      S.mode = btn.dataset.sel;
+      menu();
+      go('menu');
+      tst('Modo seleccionado');
+    };
+  });
+};
+go('menu');
 </script>
 <script src="config.js"></script>
 <script src="net.js"></script>
