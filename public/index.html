@@ -2363,7 +2363,15 @@ start = function() {
   const mates = PE.filter(p => p && p.u && p.u !== MYID);
   const totalBots = S.mode === 'br' ? Math.max(0, 9 - mates.length) : 0;
 
-  G = { f: [mk(S.sel, MYN || 'Tú', 0, sk)], p: [], ch: [], T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
+  G = {
+    f: new Array(mk(S.sel, MYN || 'Tú', 0, sk)),
+    p: new Array(),
+    ch: new Array(),
+    T: 0,
+    zr: 2000,
+    over: 0,
+    mode: S.mode || 'br'
+  };
 
   for (let i = 0; i < totalBots; i++) {
     const monName = ks[Math.floor(rng() * ks.length)];
