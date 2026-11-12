@@ -2391,7 +2391,7 @@ start = function() {
     G.zx = 1390; G.zy = 1390; G.zr = 1950;
   }
 
-  $('atk').style.display = 'block';
+G = { f: new Array(mk(S.sel, MYN || 'Tú', 0, sk)), p: new Array(), ch: new Array(), T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
   ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue'].forEach(s => {
     if ($(s)) $(s).classList.remove('on');
   });
@@ -2419,7 +2419,7 @@ hit = function(f, d, by) {
   }
 
   if (finalDmg > 1) {
-    if (!f.bot) {
+    new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue').forEach(s => {
       snd(130, 0.12, 'sawtooth', 0.09, -60);
       if (CFG && CFG.vib && navigator.vibrate) navigator.vibrate(70);
     } else if (by && !by.bot) {
