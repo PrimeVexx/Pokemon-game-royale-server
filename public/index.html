@@ -2524,7 +2524,461 @@ end = function(place) {
   $('ed').innerHTML = `Eliminaciones: ${kills}<br>Ganaste <b>${rw} 💰</b> PokeCoins`;
   setTimeout(() => show('end'), 600);
 };
-go('menu');
+/* === BLOQUE 1: 3 POKÉMON FUTBOLISTAS (32-BITS) Y SKINS DE FÚTBOL === */
+Object.assign(MON, {
+  Cinderace: { c:'#f87818', mv:'Balón Ígneo', pc:'#ff4500', hp:105, dmg:16, rate:0.42, spd:3.3, rng:400, sz:7, price:9999, pass:1, ab:'Delantero estrella de penales' },
+  Hitmonlee: { c:'#c89058', mv:'Patada Salto', pc:'#ffd23f', hp:120, dmg:21, rate:0.60, spd:2.9, rng:350, sz:8, price:9999, pass:1, ab:'Remate potente al ángulo' },
+  Passimian: { c:'#e8eef8', mv:'Tiro Libre', pc:'#4cd964', hp:115, dmg:13, rate:0.32, spd:3.1, rng:370, sz:6, price:9999, pass:1, ab:'Disparo rápido de precisión' }
+});
+
+Object.assign(SK, {
+  fut_sel: { n:'⚽ Camiseta Selección', c:'#2b8ed1', drop:1 },
+  fut_oro: { n:'🏆 Bota de Oro', c:'#ffd700', drop:1 },
+  fut_gk:  { n:'🧤 Guantes Portero', c:'#39ff14', drop:1 },
+  fut_star:{ n:'🌟 Balón Estelar', c:'#ff4500', drop:1 }
+});
+
+Object.assign(SPR, {
+  Cinderace: new Array(
+    '....kk......kk..........',
+    '...kOk......kOk.........',
+    '..kOyk......kOyk........',
+    '...kOkkkkkkkkOk.........',
+    '..kAAkOAAAAOkAAk........',
+    '..kAkwyAAAAywkAk........',
+    '...kAAyAAAAyAAk.........',
+    '....kkBBBBBBkk..........',
+    '...kBBrBBBBrrBk.........',
+    '..kAk.kBBBBk.kAk........',
+    '......kBBBBk............',
+    '.....kAk..kAk...........',
+    '....krrk..krrk..........',
+    '....kkkk..kkkk..........'
+  ),
+  Hitmonlee: new Array(
+    '......kkkkkk............',
+    '.....kCCCCCCk...........',
+    '....kCCkwkwCCk..........',
+    '....kCCCCCCCCk..........',
+    '.....kCCCCCCk...........',
+    '...kCCkCCCCkCCk.........',
+    '..kCCk.kCCk.kCCk........',
+    '..kkk..kCCk..kkk........',
+    '......kCk.kCk...........',
+    '.....kCk...kCk..........',
+    '....kCCk...kCCk.........',
+    '...kCCCk...kCCCk........',
+    '...kkkkk...kkkkk........'
+  ),
+  Passimian: new Array(
+    '.....kkkkkk.............',
+    '....kGGGGGGk............',
+    '...kGAAAAAAgk...........',
+    '..kAkwOAAAAOwkAk........',
+    '..kAAAAAAAAAAk..........',
+    '...kkAAAAAAkk...........',
+    '....kAAAAAAk....kkk.....',
+    '...kzkAAAAkzk..kzzzk....',
+    '..kzk.kAAk.kzk.kzzk.....',
+    '.kwk..kzkz..kwk.kk......',
+    '.....kzk.kzk............',
+    '....kzzk.kzzk...........',
+    '....kkkk.kkkk...........'
+  )
+});
+/* === BLOQUE 2: ARREGLO DEFINITIVO DE BATTLE ROYALE === */
+function forceStartBR() {
+  if (QT) { clearInterval(QT); QT = null; }
+  S.mode = 'br';
+  MATCH_SEED = MATCH_SEED || Math.floor(100000 + Math.random() * 899999);
+  partidaTerminada = false;
+  winHandled = false;
+  downed = false;
+  spectating = null;
+  revTimer = 0;
+  revTargetId = null;
+  if ($('rev-box')) $('rev-box').style.display = 'none';
+  if ($('spec-banner')) $('spec-banner').style.display = 'none';
+
+  const rng = seededRng(MATCH_SEED);
+  const names = NAMES.slice().sort(() => rng() - 0.5);
+  const ks = Object.keys(MON).filter(k => !MON[k].pass);
+  const sk = SK[S.skin] && (!SK[S.skin].only || SK[S.skin].only == S.sel) ? S.skin : '';
+  const mates = PE.filter(p => p && p.u && p.u !== MYID);
+  const totalBots = Math.max(0, 9 - mates.length);
+
+  const fighters = new Array(mk(S.sel, MYN || 'Tú', 0, sk));
+  for (let i = 0; i < totalBots; i++) {
+    const monName = ks[Math.floor(rng() * ks.length)];
+    const bot = mk(monName, names[i % names.length], 1, '');
+    const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
+    bot.tx = Math.max(440, Math.min(2340, z.x + Math.round((rng() - 0.5) * 120)));
+    bot.ty = Math.max(440, Math.min(2340, z.y + Math.round((rng() - 0.5) * 120)));
+    fighters.push(bot);
+  }
+
+  const chests = new Array();
+  for (let i = 0; i < 70; i++) {
+    const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
+    chests.push({
+      x: Math.max(440, Math.min(2340, z.x + Math.round((rng() - 0.5) * 420))),
+      y: Math.max(440, Math.min(2340, z.y + Math.round((rng() - 0.5) * 420)))
+    });
+  }
+
+  fighters.forEach((f, idx) => {
+    f.onp = 1;
+    f.air = 0;
+    f.jt = 1.5 + ((idx * 1.1) % 11);
+  });
+
+  G = { f: fighters, p: new Array(), ch: chests, T: 0, zr: 1950, zx: 1390, zy: 1390, zd: 6, over: 0, mode: 'br' };
+  $('atk').style.display = 'block';
+  new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue', 'pen').forEach(s => {
+    if ($(s)) $(s).classList.remove('on');
+  });
+  say('✈️ ¡10 jugadores en el avión! Pulsa SALTAR', 4);
+}
+/* === BLOQUE 3: MODO FÚTBOL PENALES (5 TIROS + 5 PARADAS + RECOMPENSAS) === */
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+  #pen { z-index: 25; background: radial-gradient(circle at 50% 25%, #2e8b57, #144d29 70%, #0a2915); text-align: center; }
+  .pen-field { width: 100%; max-width: 440px; background: #1f6e3d; border: 3px solid #fff; border-radius: 12px; padding: 14px; box-sizing: border-box; position: relative; }
+  .pen-goal { width: 100%; height: 120px; border: 4px solid #fff; border-bottom: 0; border-radius: 8px 8px 0 0; background: repeating-linear-gradient(45deg, #ffffff18 0px, #ffffff18 6px, transparent 6px, transparent 12px); display: flex; justify-content: space-around; align-items: flex-end; position: relative; overflow: hidden; }
+  .pen-zones { display: flex; gap: 8px; margin-top: 12px; }
+  .pen-zones button { flex: 1; margin: 0; padding: 12px 6px; font-size: 13px; transform: none; box-shadow: 0 3px 0 #b8860b; }
+  .pen-score { display: flex; justify-content: space-between; width: 100%; max-width: 440px; background: #0009; padding: 8px 14px; border-radius: 8px; font-weight: 900; margin-bottom: 8px; }
+  #pen-ball { font-size: 32px; transition: transform 0.45s cubic-bezier(.2,.9,.3,1); display: inline-block; margin-top: 24px; }
+</style>
+`);
+
+document.body.insertAdjacentHTML('beforeend', `
+<div class="scr" id="pen">
+  <h1>⚽ PENALES ROYALE</h1>
+  <div class="pen-score">
+    <span id="pen-p1">TÚ: 0</span>
+    <span id="pen-round">TIRO 1 / 5</span>
+    <span id="pen-p2">RIVAL: 0</span>
+  </div>
+  <div class="pen-field">
+    <div id="pen-role" style="font-weight:900;color:#fff200;margin-bottom:8px;font-size:15px">⚽ TU TURNO DE PATEAR</div>
+    <div class="pen-goal">
+      <div id="pen-gk" style="transition:transform 0.35s ease;margin-bottom:4px"><canvas id="pen-gkc" width="64" height="64"></canvas></div>
+    </div>
+    <div style="height:75px"><span id="pen-ball">⚽</span></div>
+    <div id="pen-msg" style="font-weight:800;min-height:22px;margin-bottom:6px">Elige adónde disparar</div>
+    <div class="pen-zones" id="pen-btns">
+      <button data-dir="0">⬅️ IZQUIERDA</button>
+      <button data-dir="1">⬆️ CENTRO</button>
+      <button data-dir="2">➡️ DERECHA</button>
+    </div>
+  </div>
+  <button class="g" id="pen-exit" style="margin-top:12px">Abandonar</button>
+</div>
+`);
+SC.push('pen');
+
+// Agregar tarjeta de Fútbol Penales en el selector de Modos
+const _origRmodesPen = rmodes;
+rmodes = function() {
+  _origRmodesPen();
+  const box = $('ml');
+  if (box && !$('mode-pen-card')) {
+    box.insertAdjacentHTML('beforeend', `
+      <div class="modecard" id="mode-pen-card" style="border-color:#4cd964">
+        <div>
+          <b style="color:#4cd964">⚽ FÚTBOL PENALES (1v1)</b><br>
+          <small>5 tiros + 5 paradas (vs Bot o Amigo). ¡Gana Pokémon futbolistas y skins!</small>
+        </div>
+        <button id="sel-pen" style="margin:0;padding:8px 14px;font-size:12px">ELEGIR</button>
+      </div>
+    `);
+    $('sel-pen').onclick = () => {
+      S.mode = 'pen';
+      menu();
+      go('menu');
+      tst('⚽ Modo Penales seleccionado');
+    };
+  }
+};
+
+let PEN = null;
+function startPenalties() {
+  const mate = PE.find(p => p && p.u && p.u !== MYID);
+  const isPvP = !!mate;
+  // En 2 jugadores: el líder patea primero (5 tiros) y el invitado ataja (5 paradas), luego cambian
+  const myPhase = (!isPvP || isLeader) ? 'shoot' : 'save';
+
+  PEN = {
+    isPvP,
+    mate,
+    phase: myPhase,
+    turn: 1,
+    myGoals: 0,
+    rivalGoals: 0,
+    myChoice: -1,
+    rivalChoice: -1,
+    locked: false
+  };
+
+  ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'queue'].forEach(s => { if ($(s)) $(s).classList.remove('on'); });
+  go('pen');
+  renderPenUI();
+}
+
+function renderPenUI() {
+  if (!PEN) return;
+  $('pen-p1').textContent = (MYN || 'TÚ') + ': ' + PEN.myGoals + ' ⚽';
+  $('pen-p2').textContent = (PEN.mate ? PEN.mate.n : 'BOT PORTERO') + ': ' + PEN.rivalGoals + ' ⚽';
+  $('pen-round').textContent = (PEN.phase === 'shoot' ? 'PATEANDO ' : 'ATAJANDO ') + PEN.turn + ' / 5';
+  $('pen-role').textContent = PEN.phase === 'shoot' ? '⚽ TU TURNO DE PATEAR (5 TIROS)' : '🧤 TU TURNO DE PORTERO (5 PARADAS)';
+  $('pen-msg').textContent = PEN.locked ? 'Esperando al otro jugador...' : (PEN.phase === 'shoot' ? 'Elige adónde patear:' : 'Elige adónde lanzarte:');
+
+  const gkMon = PEN.phase === 'shoot' ? (PEN.mate ? PEN.mate.mn : 'Hitmonlee') : S.sel;
+  const gkc = $('pen-gkc').getContext('2d');
+  gkc.clearRect(0, 0, 64, 64);
+  drawSpr(gkc, MON[gkMon] ? gkMon : 'Pikachu', 4, 4, 4.5, null);
+  $('pen-gk').style.transform = 'translateX(0px)';
+  $('pen-ball').style.transform = 'translate(0px, 0px) scale(1)';
+}
+
+function resolvePenTurn(shootDir, saveDir) {
+  const offset = new Array(-110, 0, 110);
+  $('pen-gk').style.transform = `translateX(${offset[saveDir]}px)`;
+  $('pen-ball').style.transform = `translate(${offset[shootDir]}px, -115px) scale(0.65)`;
+
+  const isGoal = shootDir !== saveDir;
+  if (isGoal) {
+    if (PEN.phase === 'shoot') PEN.myGoals++;
+    else PEN.rivalGoals++;
+    $('pen-msg').textContent = '⚽ ¡GOOOOL!';
+    snd(880, 0.2, 'square', 0.1, 300);
+  } else {
+    $('pen-msg').textContent = '🧤 ¡ATAJADÓN DEL PORTERO!';
+    snd(240, 0.2, 'sawtooth', 0.1, -80);
+  }
+
+  setTimeout(() => {
+    if (!PEN) return;
+    PEN.myChoice = -1;
+    PEN.rivalChoice = -1;
+    PEN.locked = false;
+
+    if (PEN.turn < 5) {
+      PEN.turn++;
+      renderPenUI();
+    } else if ((PEN.phase === 'shoot' && (!PEN.isPvP || isLeader)) || (PEN.phase === 'save' && PEN.isPvP && !isLeader)) {
+      // Cambiar de rol después de los primeros 5 penales
+      PEN.phase = PEN.phase === 'shoot' ? 'save' : 'shoot';
+      PEN.turn = 1;
+      tst('🔄 ¡Cambio de lado! Ahora te toca ' + (PEN.phase === 'shoot' ? 'PATEAR' : 'ATAJAR'));
+      renderPenUI();
+    } else {
+      finishPenalties();
+    }
+  }, 1300);
+}
+
+function finishPenalties() {
+  const win = PEN.myGoals >= PEN.rivalGoals;
+  const scoreTxt = `${PEN.myGoals} - ${PEN.rivalGoals}`;
+  PEN = null;
+
+  let rewardMsg = 'Ganaste <b>40 💰</b> PokeCoins';
+  S.coins = (Number(S.coins) || 0) + (win ? 120 : 40);
+
+  if (win) {
+    const futMons = new Array('Cinderace', 'Hitmonlee', 'Passimian').filter(m => !S.own.includes(m));
+    const futSkins = new Array('fut_sel', 'fut_oro', 'fut_gk', 'fut_star').filter(k => !S.skins.includes(k));
+    if (futMons.length > 0) {
+      const wonMon = futMons[Math.floor(Math.random() * futMons.length)];
+      S.own.push(wonMon);
+      rewardMsg = `🎉 ¡DESBLOQUEASTE A <b>${wonMon.toUpperCase()}</b> + 120 💰!`;
+    } else if (futSkins.length > 0) {
+      const wonSk = futSkins[Math.floor(Math.random() * futSkins.length)];
+      S.skins.push(wonSk);
+      rewardMsg = `👕 ¡GANASTE SKIN <b>${SK[wonSk].n}</b> + 120 💰!`;
+    } else {
+      S.coins += 180;
+      rewardMsg = '🏆 ¡Ya tienes toda la colección de fútbol! +300 💰';
+    }
+  }
+  save();
+  $('et').textContent = win ? '🏆 ¡CAMPEÓN DE PENALES!' : '⚽ FIN DE LA TANDA';
+  $('ed').innerHTML = `Marcador final: <b>${scoreTxt}</b><br>${rewardMsg}`;
+  show('end');
+}
+
+$('pen-btns').querySelectorAll('button').forEach(b => {
+  b.onclick = () => {
+    if (!PEN || PEN.locked) return;
+    const dir = Number(b.dataset.dir);
+    PEN.myChoice = dir;
+    PEN.locked = true;
+
+    if (!PEN.isPvP) {
+      const botDir = Math.floor(Math.random() * 3);
+      if (PEN.phase === 'shoot') resolvePenTurn(dir, botDir);
+      else resolvePenTurn(botDir, dir);
+    } else {
+      $('pen-msg').textContent = '⏳ Esperando elección del rival...';
+      if (R) R.presence({ penTurn: PEN.phase + '_' + PEN.turn, penDir: dir });
+    }
+  };
+});
+
+$('pen-exit').onclick = () => { PEN = null; go('menu'); };
+
+// Sincronizar elecciones de penales en tiempo real cuando juegan 2 amigos
+setInterval(() => {
+  if (!PEN || !PEN.isPvP || !PEN.locked) return;
+  const key = PEN.phase + '_' + PEN.turn;
+  const oppKey = (PEN.phase === 'shoot' ? 'save_' : 'shoot_') + PEN.turn;
+  const opp = PE.find(p => p && p.u !== MYID && p.penTurn === oppKey && p.penDir >= 0);
+  if (opp) {
+    const sDir = PEN.phase === 'shoot' ? PEN.myChoice : opp.penDir;
+    const gDir = PEN.phase === 'save' ? PEN.myChoice : opp.penDir;
+    resolvePenTurn(sDir, gDir);
+  }
+}, 200);
+
+// Conectar el botón JUGAR principal para que funcione perfecto en Battle Royale, Penales, Horda y Rayquaza
+launchGroupMode = function(mode, seed) {
+  if (QT) { clearInterval(QT); QT = null; }
+  S.mode = mode || 'br';
+  MATCH_SEED = seed || MATCH_SEED;
+  menu();
+  if (S.mode === 'h') startH();
+  else if (S.mode === 'rq') startRQ();
+  else if (S.mode === 'pen') startPenalties();
+  else forceStartBR();
+};
+
+$('play').onclick = () => {
+  if (R && !isLeader) {
+    tst('Solo el líder del grupo puede iniciar la partida');
+    return;
+  }
+  MATCH_SEED = Math.floor(100000 + Math.random() * 899999);
+  myGoTs = Date.now();
+  myGoMode = S.mode;
+  lastgo = myGoTs;
+  if (R) {
+    R.presence({
+      n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
+      leader: 1, go: myGoTs, mode: myGoMode, seed: MATCH_SEED,
+      downed: 0, reviveTarget: ''
+    });
+  }
+  launchGroupMode(S.mode, MATCH_SEED);
+};
+/* === COFRE DORADO MÍTICO (1 EN 1000) QUE OTORGA A ARCEUS AL TOCARLO === */
+function markArceusChests() {
+  if (!G || !G.ch) return;
+  G.ch.forEach(c => {
+    if (c.arceusChecked) return;
+    c.arceusChecked = true;
+    // Probabilidad exacta de 1 en 1000 cofres
+    if (Math.random() < 0.001) {
+      c.isArceus = true;
+    }
+  });
+}
+
+// 1. Dibujar el Cofre Dorado Mítico con aura brillante y destellos en el mapa
+const _drawArceusChest = draw;
+draw = function() {
+  _drawArceusChest();
+  if (!G || G.over || !G.ch) return;
+  markArceusChests();
+
+  const me = G.f;
+  const sc = Math.min(1.2, Math.max(0.7, w / 700));
+  const t = Date.now() / 180;
+
+  cx.save();
+  cx.translate(w / 2, h / 2);
+  cx.scale(sc, sc);
+  cx.translate(-me.x, -me.y);
+
+  G.ch.forEach(k => {
+    if (!k.isArceus) return;
+    const pulse = 1 + Math.sin(t) * 0.14;
+
+    // Aura radial dorada brillante
+    const grad = cx.createRadialGradient(k.x, k.y, 4, k.x, k.y, 34 * pulse);
+    grad.addColorStop(0, 'rgba(255, 242, 0, 0.95)');
+    grad.addColorStop(0.5, 'rgba(255, 180, 0, 0.45)');
+    grad.addColorStop(1, 'rgba(255, 180, 0, 0)');
+    cx.fillStyle = grad;
+    cx.beginPath();
+    cx.arc(k.x, k.y, 34 * pulse, 0, Math.PI * 2);
+    cx.fill();
+
+    // Cuerpo del Cofre Dorado
+    cx.shadowColor = '#fff200';
+    cx.shadowBlur = 16;
+    cx.fillStyle = '#ffd700';
+    cx.strokeStyle = '#6b4400';
+    cx.lineWidth = 2.5;
+    cx.fillRect(k.x - 16, k.y - 12, 32, 24);
+    cx.strokeRect(k.x - 16, k.y - 12, 32, 24);
+
+    // Tapa y cerradura brillante
+    cx.fillStyle = '#fff59d';
+    cx.fillRect(k.x - 16, k.y - 12, 32, 8);
+    cx.strokeRect(k.x - 16, k.y - 12, 32, 8);
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(k.x - 3, k.y - 6, 6, 8);
+    cx.shadowBlur = 0;
+
+    // Etiqueta flotante
+    cx.fillStyle = '#fff200';
+    cx.font = '900 10px sans-serif';
+    cx.textAlign = 'center';
+    cx.fillText('✨ MÍTICO ✨', k.x, k.y - 18);
+  });
+
+  cx.restore();
+};
+
+// 2. Detectar cuando el jugador toca el Cofre Dorado Mítico
+setInterval(() => {
+  if (!G || G.over || !G.ch || !G.f || !G.f.alive) return;
+  markArceusChests();
+  const me = G.f;
+
+  for (let i = G.ch.length - 1; i >= 0; i--) {
+    const k = G.ch[i];
+    if (k.isArceus && Math.hypot(k.x - me.x, k.y - me.y) < 34) {
+      G.ch.splice(i, 1);
+      if (typeof xp === 'function') xp(me, 5);
+      if (typeof mq === 'function') mq('c', 1);
+      snd(1047, 0.3, 'square', 0.14, 600);
+
+      if (!S.own.includes('Arceus')) {
+        S.own.push('Arceus');
+        say('🌟 ¡¡ENCONTRASTE EL COFRE DORADO (1/1000)!! ARCEUS DESBLOQUEADO 🌟', 6);
+      } else {
+        S.coins = (Number(S.coins) || 0) + 1000;
+        say('🌟 ¡COFRE DORADO DE ARCEUS! +1000 💰 PokeCoins', 5);
+      }
+      save();
+      break;
+    }
+  }
+}, 80);
+
+// 3. Mostrar la probabilidad exacta (1 en 1000) en la pestaña Tesoro
+const _origTesArceus = tes;
+tes = function() {
+  _origTesArceus();
+  const box = $('tc');
+  if (box) {
+    box.innerHTML = box.innerHTML
+      .replace(/5% \(1 en 20\)|0\.00\d+%|0\.0\d+%|0\.\d+%/g, '0.1% (1 en 1000 Cofre Dorado)');
+  }
+};
 </script>
 <script src="config.js"></script>
 <script src="net.js"></script>
