@@ -1955,10 +1955,20 @@ draw = function() {
     cx.fill();
     cx.stroke();
   });
-
+	
   cx.restore();
 };
-/* === RANKING MUNDIAL ONLINE + IDIOMAS REPARADOS + AUTÉNTICO GAME BOY CLÁSICO === */
+xX; i++) {
+      const ch = row[i];
+      if (!ch || ch === '.') continue;
+      const rawCol = PL[ch] || MON[mn].c;
+      g.fillStyle = ch === 'k' ? '#0f380f' : ch === 'w' ? '#9bbc0f' : toGBColor(rawCol);
+      g.fillRect(Math.round(ox + (i - minX) * step), Math.round(oy + (j - minY) * step), Math.ceil(step), Math.ceil(step));
+    }
+  }
+  g.restore();
+};
+/* === PARTE 2A: ESTILOS, PANTALLA DE CONFIGURACIÓN Y GAME BOY REAL (4 TONOS) === */
 document.head.insertAdjacentHTML('beforeend', `
 <style>
   #cfg { z-index: 30; background: linear-gradient(160deg, #162238, #0b1324); overflow-y: auto; }
@@ -1969,14 +1979,14 @@ document.head.insertAdjacentHTML('beforeend', `
   .cfg-card input[type=range] { width: 110px; accent-color: #fff200; }
   .cfg-btn { margin: 0; padding: 7px 14px; font-size: 12px; transform: none; box-shadow: none; min-width: 64px; }
 
-  /* Auténtico estilo Game Boy Clásico (4 tonos verdes reales DMG-01) */
+  /* Paleta Game Boy Clásico DMG-01 (4 tonos verdes auténticos) */
   body.fx-gb .scr { background: #8bac0f !important; color: #0f380f !important; text-shadow: none !important; }
   body.fx-gb #gnav { background: #0f380f !important; color: #9bbc0f !important; }
   body.fx-gb .tb.on { background: #9bbc0f !important; color: #0f380f !important; }
   body.fx-gb .row, body.fx-gb .cfg-card, body.fx-gb .modecard, body.fx-gb .promo { background: #9bbc0f !important; border: 2px solid #0f380f !important; color: #0f380f !important; }
   body.fx-gb button, body.fx-gb #play { background: #306230 !important; color: #9bbc0f !important; border: 2px solid #0f380f !important; box-shadow: none !important; }
   body.fx-gb h1, body.fx-gb .cfg-sec { color: #0f380f !important; text-shadow: none !important; border-color: #0f380f !important; }
-  body.fx-gb canvas { filter: grayscale(100%) sepia(100%) hue-rotate(48deg) saturate(320%) contrast(135%) brightness(88%); }
+  body.fx-gb #c { filter: grayscale(100%) sepia(100%) hue-rotate(48deg) saturate(320%) contrast(135%) brightness(88%); }
 
   body.fx-gbc { filter: saturate(145%) contrast(112%); }
   body.fx-crt { filter: contrast(120%) brightness(95%); }
@@ -1997,7 +2007,7 @@ document.body.insertAdjacentHTML('beforeend', `
   <div class="cfg-box">
     <div class="cfg-sec">🌐 GENERAL E IDIOMA</div>
     <div class="cfg-card">
-      <div><b id="lbl-lang">Idioma / Language</b><br><small id="sub-lang">Español, English o Português</small></div>
+      <div><b>Idioma / Language</b><br><small>Español, English o Português</small></div>
       <select id="opt-lang">
         <option value="es">🇪🇸 Español</option>
         <option value="en">🇺🇸 English</option>
@@ -2005,17 +2015,17 @@ document.body.insertAdjacentHTML('beforeend', `
       </select>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-fps">Mostrar Contador FPS</b><br><small id="sub-fps">Rendimiento en tiempo real</small></div>
+      <div><b>Mostrar Contador FPS</b><br><small>Rendimiento en tiempo real</small></div>
       <button class="g cfg-btn" id="opt-fps">NO</button>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-full">Pantalla Completa</b><br><small id="sub-full">Maximizar ventana de juego</small></div>
+      <div><b>Pantalla Completa</b><br><small>Maximizar ventana de juego</small></div>
       <button class="g cfg-btn" id="opt-full">ACTIVAR</button>
     </div>
 
     <div class="cfg-sec">🎨 GRÁFICOS Y ACCESIBILIDAD</div>
     <div class="cfg-card">
-      <div><b id="lbl-vis">Modo Visual / Pantalla</b><br><small id="sub-vis">Game Boy Verde real, CRT o Daltonismo</small></div>
+      <div><b>Modo Visual / Pantalla</b><br><small>Game Boy Verde real, CRT o Daltonismo</small></div>
       <select id="opt-vis">
         <option value="none">Normal (32-Bits)</option>
         <option value="gb">🟩 Game Boy Clásico (4 Tonos Verdes)</option>
@@ -2027,29 +2037,29 @@ document.body.insertAdjacentHTML('beforeend', `
       </select>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-dmg">Números de Daño</b><br><small id="sub-dmg">Mostrar daño flotante y críticos</small></div>
+      <div><b>Números de Daño</b><br><small>Mostrar daño flotante y críticos</small></div>
       <button class="g cfg-btn" id="opt-dmg">SÍ</button>
     </div>
 
     <div class="cfg-sec">🎮 CONTROLES Y AUDIO</div>
     <div class="cfg-card">
-      <div><b id="lbl-aim">Auto-Apuntado Inteligente</b><br><small id="sub-aim">Apuntar al rival más cercano</small></div>
+      <div><b>Auto-Apuntado Inteligente</b><br><small>Apuntar al rival más cercano</small></div>
       <button class="g cfg-btn" id="opt-aim">SÍ</button>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-vib">Vibración Háptica</b><br><small id="sub-vib">Vibrar al golpear o recibir daño</small></div>
+      <div><b>Vibración Háptica</b><br><small>Vibrar al golpear o recibir daño</small></div>
       <button class="g cfg-btn" id="opt-vib">SÍ</button>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-qchat">Chat Rápido en Batalla</b><br><small id="sub-qchat">Mostrar botones Ayuda/Vamos</small></div>
+      <div><b>Chat Rápido en Batalla</b><br><small>Mostrar botones Ayuda/Vamos</small></div>
       <button class="g cfg-btn" id="opt-qchat">SÍ</button>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-snd">Música y Efectos</b><br><small id="sub-snd">Sonido 16-bits del juego</small></div>
+      <div><b>Música y Efectos</b><br><small>Sonido 16-bits del juego</small></div>
       <button class="g cfg-btn" id="opt-snd">SÍ</button>
     </div>
     <div class="cfg-card">
-      <div><b id="lbl-vol">Volumen General</b><br><small id="sub-vol">Intensidad del sonido</small></div>
+      <div><b>Volumen General</b><br><small>Intensidad del sonido</small></div>
       <input type="range" id="opt-vol" min="0" max="100" value="90">
     </div>
     <div class="cfg-card" style="border-color:#ff525266;margin-top:6px">
@@ -2064,12 +2074,11 @@ document.body.insertAdjacentHTML('beforeend', `
 
 SC.push('cfg');
 
-/* 1. PALETA DE 4 TONOS VERDES AUTÉNTICOS PARA GAME BOY CLÁSICO */
 const GB_PAL = ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'];
 function toGBColor(hex) {
-  if (!hex || hex[0] !== '#') return '#306230';
+  if (!hex || hex !== '#') return '#306230';
   let c = hex.slice(1);
-  if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+  if (c.length === 3) c = c+c+c+c+c+c;
   const n = parseInt(c, 16);
   const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   if (lum < 0.22) return GB_PAL;
@@ -2115,8 +2124,7 @@ drawSpr0 = function(g, mn, x, y, px, sc) {
   }
   g.restore();
 };
-
-/* 2. IDIOMAS REPARADOS CON IDENTIFICADORES FIJOS (SIN BLOQUEAR PESTAÑAS) */
+/* === PARTE 2B: IDIOMAS REPARADOS Y RANKING MUNDIAL ONLINE === */
 const DEFAULT_CFG = { lang: 'es', vis: 'none', dmg: true, aim: true, vib: true, qchat: true, fps: false, vol: 90 };
 let CFG = Object.assign({}, DEFAULT_CFG, J('pr_cfg', {}));
 const saveCfg = () => W('pr_cfg', CFG);
@@ -2127,80 +2135,87 @@ const LANG_MAP = {
     pas: 'PASES', mis: 'MISIONES', fr: 'AMIGOS', cmp: 'COMPETIR',
     play: 'JUGAR', wait: 'ESPERANDO AL LÍDER...', back: 'Volver',
     cfgTitle: '⚙️ CONFIGURACIÓN', yes: 'SÍ', no: 'NO', create: 'Crear', join: 'Unirse',
-    cmpTitle: '🏆 RANKING MUNDIAL ONLINE', brTab: 'Battle Royale', hTab: 'Horda Zombie', rqTab: 'Evento Rayquaza'
+    brTab: 'Battle Royale', hTab: 'Horda Zombie', rqTab: 'Evento Rayquaza'
   },
   en: {
     menu: 'PLAY', modes: 'MODES', shop: 'SHOP', inv: 'LOCKER', tes: 'TREASURE',
     pas: 'PASS', mis: 'QUESTS', fr: 'FRIENDS', cmp: 'COMPETE',
     play: 'PLAY', wait: 'WAITING FOR LEADER...', back: 'Back',
     cfgTitle: '⚙️ SETTINGS', yes: 'ON', no: 'OFF', create: 'Create', join: 'Join',
-    cmpTitle: '🏆 GLOBAL ONLINE LEADERBOARD', brTab: 'Battle Royale', hTab: 'Zombie Horde', rqTab: 'Rayquaza Event'
+    brTab: 'Battle Royale', hTab: 'Zombie Horde', rqTab: 'Rayquaza Event'
   },
   pt: {
     menu: 'JOGAR', modes: 'MODOS', shop: 'LOJA', inv: 'VESTIÁRIO', tes: 'TESOURO',
     pas: 'PASSES', mis: 'MISSÕES', fr: 'AMIGOS', cmp: 'COMPETIR',
     play: 'JOGAR', wait: 'AGUARDANDO O LÍDER...', back: 'Voltar',
     cfgTitle: '⚙️ CONFIGURAÇÕES', yes: 'SIM', no: 'NÃO', create: 'Criar', join: 'Entrar',
-    cmpTitle: '🏆 RANKING MUNDIAL ONLINE', brTab: 'Battle Royale', hTab: 'Horda Zumbi', rqTab: 'Evento Rayquaza'
+    brTab: 'Battle Royale', hTab: 'Horda Zumbi', rqTab: 'Evento Rayquaza'
   }
 };
-// Asignar navegación fija por data-scr para que nunca se rompa al traducir
+
 (function bindStableNav() {
-const nav = $('gnav');
-if (!nav) return;
-const mapByInitial = {
-'JUGAR': 'menu', 'MODOS': 'modes', 'TESORO': 'tes', 'TIENDA': 'shop',
-'CASILLERO': 'inv', 'PASES': 'pas', 'MISIONES': 'mis', 'AMIGOS': 'fr', 'COMPETIR': 'cmp'
-};
-nav.querySelectorAll('.tb').forEach(b => {
-const raw = b.textContent.trim();
-if (mapByInitial[raw]) b.dataset.scr = mapByInitial[raw];
-b.onclick = () => {
-const target = b.dataset.scr;
-if (target === 'modes' && R && !isLeader) {
-tst('Solo el creador del grupo puede elegir el modo');
-return;
-}
-if (target) go(target);
-};
-});
-nav.querySelectorAll('span').forEach(sp => {
-if (sp.textContent.includes('🔍') || sp.textContent.includes('⚙️')) {
-sp.textContent = '⚙️';
-sp.style.cursor = 'pointer';
-sp.style.fontSize = '17px';
-sp.style.padding = '2px 6px';
-sp.onclick = () => { applySettings(); go('cfg'); };
-}
-});
+  const nav = $('gnav');
+  if (!nav) return;
+  const mapByInitial = {
+    'JUGAR': 'menu', 'MODOS': 'modes', 'TESORO': 'tes', 'TIENDA': 'shop',
+    'CASILLERO': 'inv', 'PASES': 'pas', 'MISIONES': 'mis', 'AMIGOS': 'fr', 'COMPETIR': 'cmp'
+  };
+  nav.querySelectorAll('.tb').forEach(b => {
+    const raw = b.textContent.trim();
+    if (mapByInitial[raw]) b.dataset.scr = mapByInitial[raw];
+    b.onclick = () => {
+      const target = b.dataset.scr;
+      if (target === 'modes' && R && !isLeader) {
+        tst('Solo el creador del grupo puede elegir el modo');
+        return;
+      }
+      if (target) go(target);
+    };
+  });
+  nav.querySelectorAll('span').forEach(sp => {
+    if (sp.textContent.includes('🔍') || sp.textContent.includes('⚙️')) {
+      sp.textContent = '⚙️';
+      sp.style.cursor = 'pointer';
+      sp.style.fontSize = '17px';
+      sp.style.padding = '2px 6px';
+      sp.onclick = () => { applySettings(); go('cfg'); };
+    }
+  });
 })();
+
 function applySettings() {
-document.body.classList.remove('fx-gb', 'fx-gbc', 'fx-crt', 'fx-cb1', 'fx-cb2', 'fx-cb3');
-if (CFG.vis && CFG.vis !== 'none') document.body.classList.add('fx-' + CFG.vis);
-if (MG && AC) MG.gain.value = (CFG.vol / 100) * 0.9;
-if ($('fps-hud')) $('fps-hud').style.display = CFG.fps ? 'block' : 'none';
-const L = LANG_MAP[CFG.lang] || LANG_MAP.es;
-if ($('cfg-title')) $('cfg-title').textContent = L.cfgTitle;
-if ($('cfg-back')) $('cfg-back').textContent = L.back;
-if ($('pnew')) $('pnew').textContent = L.create;
-if ($('pjoin')) $('pjoin').textContent = L.join;
-const canControl = !R || isLeader;
-if ($('play')) $('play').textContent = canControl ? L.play : L.wait;
-document.querySelectorAll('#gnav .tb').forEach(b => {
-const sc = b.dataset.scr;
-if (sc && L[sc]) b.textContent = L[sc];
-});
-$('opt-lang').value = CFG.lang;
-$('opt-vis').value = CFG.vis;
-$('opt-vol').value = CFG.vol;
-$('opt-fps').textContent = CFG.fps ? L.yes : L.no;
-$('opt-dmg').textContent = CFG.dmg ? L.yes : L.no;
-$('opt-aim').textContent = CFG.aim ? L.yes : L.no;
-$('opt-vib').textContent = CFG.vib ? L.yes : L.no;
-$('opt-qchat').textContent = CFG.qchat ? L.yes : L.no;
-$('opt-snd').textContent = !MUTE ? L.yes : L.no;
-menu();
+  document.body.classList.remove('fx-gb', 'fx-gbc', 'fx-crt', 'fx-cb1', 'fx-cb2', 'fx-cb3');
+  if (CFG.vis && CFG.vis !== 'none') document.body.classList.add('fx-' + CFG.vis);
+
+  if (MG && AC) MG.gain.value = (CFG.vol / 100) * 0.9;
+  if ($('fps-hud')) $('fps-hud').style.display = CFG.fps ? 'block' : 'none';
+
+  const L = LANG_MAP[CFG.lang] || LANG_MAP.es;
+  if ($('cfg-title')) $('cfg-title').textContent = L.cfgTitle;
+  if ($('cfg-back')) $('cfg-back').textContent = L.back;
+  if ($('pnew')) $('pnew').textContent = L.create;
+  if ($('pjoin')) $('pjoin').textContent = L.join;
+
+  const canControl = !R || isLeader;
+  if ($('play')) $('play').textContent = canControl ? L.play : L.wait;
+
+  document.querySelectorAll('#gnav .tb').forEach(b => {
+    const sc = b.dataset.scr;
+    if (sc && L[sc]) b.textContent = L[sc];
+  });
+
+  $('opt-lang').value = CFG.lang;
+  $('opt-vis').value = CFG.vis;
+  $('opt-vol').value = CFG.vol;
+  $('opt-fps').textContent = CFG.fps ? L.yes : L.no;
+  $('opt-dmg').textContent = CFG.dmg ? L.yes : L.no;
+  $('opt-aim').textContent = CFG.aim ? L.yes : L.no;
+  $('opt-vib').textContent = CFG.vib ? L.yes : L.no;
+  $('opt-qchat').textContent = CFG.qchat ? L.yes : L.no;
+  $('opt-snd').textContent = !MUTE ? L.yes : L.no;
+  menu();
 }
+
 $('opt-lang').onchange = e => { CFG.lang = e.target.value; saveCfg(); applySettings(); };
 $('opt-vis').onchange = e => { CFG.vis = e.target.value; saveCfg(); applySettings(); };
 $('opt-vol').oninput = e => { CFG.vol = +e.target.value; saveCfg(); applySettings(); };
@@ -2211,75 +2226,85 @@ $('opt-vib').onclick = () => { CFG.vib = !CFG.vib; saveCfg(); applySettings(); i
 $('opt-qchat').onclick = () => { CFG.qchat = !CFG.qchat; saveCfg(); applySettings(); };
 $('opt-snd').onclick = () => { MUTE = !MUTE; if ($('mus')) $('mus').textContent = MUTE ? '🔇' : '♫'; applySettings(); };
 $('opt-full').onclick = () => {
-if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-else document.exitFullscreen().catch(() => {});
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
 };
 $('opt-rst').onclick = () => { CFG = Object.assign({}, DEFAULT_CFG); MUTE = false; saveCfg(); applySettings(); tst('⚙️ Configuración restablecida'); };
 $('cfg-back').onclick = () => go('menu');
-/* 3. MODO COMPETIR MUNDIAL ONLINE (CONECTADO AL SERVIDOR DE RENDER) */
+
 let cmpTab = 'br';
 cmp = async function() {
-const L = LANG_MAP[CFG.lang] || LANG_MAP.es;
-const API = (window.API_URL || location.origin).replace(//$/, '');
-const box = $('cmc');
-box.innerHTML = <div class="cmp-tabs"> <button id="ct-br" class="${cmpTab==='br'?'on':''}">${L.brTab}</button> <button id="ct-h" class="${cmpTab==='h'?'on':''}">${L.hTab}</button> <button id="ct-rq" class="${cmpTab==='rq'?'on':''}">${L.rqTab}</button> </div><div id="ct-body"><small>Cargando ranking mundial...</small></div>;
-$('ct-br').onclick = () => { cmpTab = 'br'; cmp(); };
-$('ct-h').onclick = () => { cmpTab = 'h'; cmp(); };
-$('ct-rq').onclick = () => { cmpTab = 'rq'; cmp(); };
-let rows = [];
-try {
-const res = await fetch(API + '/api/leaderboard');
-if (res.ok) rows = await res.json();
-} catch (e) {}
-// Incluir al jugador actual si juega en modo local o aún no aparece
-if (!rows.some(r => r.name === MYN)) {
-const t = S.st || {};
-rows.push({ id: MYID, name: MYN, brw: t.brw || 0, brk: t.brk || 0, zd: t.zd || 0, zk: t.zk || 0, rqw: t.rqw || 0, rqg: t.rqg || 0 });
-}
-const cfgMap = {
-br: { title: '🏆 TOP BATTLE ROYALE', k1: 'brw', l1: 'Victorias', k2: 'brk', l2: 'Elim.' },
-h:  { title: '🧟 TOP HORDA ZOMBIE', k1: 'zd', l1: 'Mejor Día', k2: 'zk', l2: 'Zombis' },
-rq: { title: '🐉 TOP EVENTO RAYQUAZA', k1: 'rqw', l1: 'Victorias', k2: 'rqg', l2: 'Partidas' }
-};
-const c = cfgMap[cmpTab];
-const sorted = rows.slice().sort((a, b) => (b[c.k1] - a[c.k1]) || (b[c.k2] - a[c.k2])).slice(0, 25);
-$('ct-body').innerHTML = `${c.title}
-{sorted.map((r, i) => `<tr class="{r.name === MYN ? 'me' : ''}">
+  const L = LANG_MAP[CFG.lang] || LANG_MAP.es;
+  const API = (window.API_URL || location.origin).replace(/\/$/, '');
+  const box = $('cmc');
+  box.innerHTML = `<div class="cmp-tabs">
+    <button id="ct-br" class="${cmpTab==='br'?'on':''}">${L.brTab}</button>
+    <button id="ct-h" class="${cmpTab==='h'?'on':''}">${L.hTab}</button>
+    <button id="ct-rq" class="${cmpTab==='rq'?'on':''}">${L.rqTab}</button>
+  </div><div id="ct-body"><small>Cargando ranking mundial...</small></div>`;
 
-	Entrenador	${c.l1}	${c.l2}
-${['🥇','🥈','🥉'][i] || (i + 1)}	${esc(r.name)}	${r[c.k1]}	${r[c.k2]}
+  $('ct-br').onclick = () => { cmpTab = 'br'; cmp(); };
+  $('ct-h').onclick = () => { cmpTab = 'h'; cmp(); };
+  $('ct-rq').onclick = () => { cmpTab = 'rq'; cmp(); };
 
-`).join('')}
-🌐 Ranking sincronizado en tiempo real con el servidor`;
+  let rows = [];
+  try {
+    const res = await fetch(API + '/api/leaderboard');
+    if (res.ok) rows = await res.json();
+  } catch (e) {}
+
+  if (!rows.some(r => r.name === MYN)) {
+    const t = S.st || {};
+    rows.push({ id: MYID, name: MYN, brw: t.brw || 0, brk: t.brk || 0, zd: t.zd || 0, zk: t.zk || 0, rqw: t.rqw || 0, rqg: t.rqg || 0 });
+  }
+
+  const cfgMap = {
+    br: { title: '🏆 TOP BATTLE ROYALE', k1: 'brw', l1: 'Victorias', k2: 'brk', l2: 'Elim.' },
+    h:  { title: '🧟 TOP HORDA ZOMBIE', k1: 'zd', l1: 'Mejor Día', k2: 'zk', l2: 'Zombis' },
+    rq: { title: '🐉 TOP EVENTO RAYQUAZA', k1: 'rqw', l1: 'Victorias', k2: 'rqg', l2: 'Partidas' }
+  };
+  const c = cfgMap[cmpTab];
+  const sorted = rows.slice().sort((a, b) => (b[c.k1] - a[c.k1]) || (b[c.k2] - a[c.k2])).slice(0, 25);
+
+  $('ct-body').innerHTML = `<div class="ct"><h3>${c.title}</h3>
+    <table><tr><th>#</th><th>Entrenador</th><th>${c.l1}</th><th>${c.l2}</th></tr>
+    ${sorted.map((r, i) => `<tr class="${r.name === MYN ? 'me' : ''}">
+      <td>${['🥇','🥈','🥉'][i] || (i + 1)}</td>
+      <td>${esc(r.name)}</td>
+      <td><b>${r[c.k1]}</b></td>
+      <td>${r[c.k2]}</td>
+    </tr>`).join('')}
+    </table></div><small style="display:block;margin-top:8px">🌐 Ranking sincronizado en tiempo real con el servidor</small>`;
 };
-// Medidor FPS y hooks de daño/vibración
+
 const _origAddFloat = addFloat;
 addFloat = function(x, y, txt, col, big) { if (CFG.dmg) _origAddFloat(x, y, txt, col, big); };
 const _origHitVib = hit;
 hit = function(f, d, by) {
-if (CFG.vib && navigator.vibrate && d > 1) {
-if (!f.bot) navigator.vibrate(80);
-else if (by && !by.bot && f.hp - d <= 0) navigator.vibrate();
-}
-return _origHitVib(f, d, by);
+  if (CFG.vib && navigator.vibrate && d > 1) {
+    if (!f.bot) navigator.vibrate(80);
+    else if (by && !by.bot && f.hp - d <= 0) navigator.vibrate();
+  }
+  return _origHitVib(f, d, by);
 };
 const _origNear = near;
 near = function(f, list) { return (!f.bot && !CFG.aim) ? [null, 1e9] : _origNear(f, list); };
+
 let fpsFrames = 0, fpsLast = performance.now();
 function fpsTick(now) {
-fpsFrames++;
-if (now - fpsLast >= 500) {
-if (CFG.fps && $('fps-hud')) $('fps-hud').textContent = Math.round((fpsFrames * 1000) / (now - fpsLast)) + ' FPS';
-fpsFrames = 0; fpsLast = now;
-}
-requestAnimationFrame(fpsTick);
+  fpsFrames++;
+  if (now - fpsLast >= 500) {
+    if (CFG.fps && $('fps-hud')) $('fps-hud').textContent = Math.round((fpsFrames * 1000) / (now - fpsLast)) + ' FPS';
+    fpsFrames = 0; fpsLast = now;
+  }
+  requestAnimationFrame(fpsTick);
 }
 requestAnimationFrame(fpsTick);
 setInterval(() => { if (!CFG.qchat && $('qchat-bar')) $('qchat-bar').style.display = 'none'; }, 250);
+
 applySettings();
 go('menu');
 </script>
 <script src="config.js"></script>
 <script src="net.js"></script>
 </body></html>
-
