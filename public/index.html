@@ -1958,16 +1958,6 @@ draw = function() {
 	
   cx.restore();
 };
-xX; i++) {
-      const ch = row[i];
-      if (!ch || ch === '.') continue;
-      const rawCol = PL[ch] || MON[mn].c;
-      g.fillStyle = ch === 'k' ? '#0f380f' : ch === 'w' ? '#9bbc0f' : toGBColor(rawCol);
-      g.fillRect(Math.round(ox + (i - minX) * step), Math.round(oy + (j - minY) * step), Math.ceil(step), Math.ceil(step));
-    }
-  }
-  g.restore();
-};
 /* === PARTE 2A: ESTILOS, PANTALLA DE CONFIGURACIÓN Y GAME BOY REAL (4 TONOS) === */
 document.head.insertAdjacentHTML('beforeend', `
 <style>
