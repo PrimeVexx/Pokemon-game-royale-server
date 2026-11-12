@@ -2391,10 +2391,13 @@ start = function() {
     G.zx = 1390; G.zy = 1390; G.zr = 1950;
   }
 
-G = { f: new Array(mk(S.sel, MYN || 'Tú', 0, sk)), p: new Array(), ch: new Array(), T: 0, zr: 2000, over: 0, mode: S.mode || 'br' };
-  ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue'].forEach(s => {
+  $('atk').style.display = 'block';
+  new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue').forEach(s => {
     if ($(s)) $(s).classList.remove('on');
   });
+  say(S.mode === 'br' ? '✈️ ¡10 jugadores en el avión! Pulsa SALTAR' : '⚡ ¡Comienza la batalla!', 4);
+};
+
 hit = function(f, d, by) {
   if (!f || !f.alive || !G || G.over) return;
 
@@ -2479,7 +2482,6 @@ hit = function(f, d, by) {
     }
   }
 };
-
 // 4. Fin de partida limpio con notas válidas y monedas numéricas
 end = function(place) {
   if (partidaTerminada) return;
