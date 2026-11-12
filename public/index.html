@@ -1732,6 +1732,504 @@ Object.assign(SG, {
     d: 'k . s . k k s . k . s . k k s s'.split(' ')
   }
 });
+  /* === MEJORAS FINALES: DAÑO FLOTANTE, CRÍTICOS, RADAR DE GRUPO, RACHAS Y REGALO DIARIO === */
+let floatTexts = [];
+let killStreak = 0;
+let lastKillTs = 0;
+
+function addFloat(x, y, txt, col, big = false) {
+  floatTexts.push({ x, y, txt, col, big, t: 0 });
+}
+
+// 1. Números de daño flotantes, golpes críticos (15% prob.) y rachas de bajas
+const _origHitFinal = hit;
+hit = function(f, d, by) {
+  if (d > 1 && f && f.alive) {
+    const isCrit = by && Math.random() < 0.15;
+    const finalDmg = isCrit ? d * 1.5 : d;
+    addFloat(
+      f.x + (Math.random() - 0.5) * 16,
+      f.y - 26,
+      (isCrit ? '💥 ' : '-') + Math.round(finalDmg),
+      isCrit ? '#fff200' : (f.bot ? '#ffffff' : '#ff5252'),
+      isCrit
+    );
+
+    // Detectar eliminación para anunciar racha de bajas
+    if (by && !by.bot && f.hp - finalDmg <= 0) {
+      const now = Date.now();
+      killStreak = (now - lastKillTs < 12000) ? killStreak + 1 : 1;
+      lastKillTs = now;
+      const banners = {
+        2: '🔥 ¡DOBLE ELIMINACIÓN!',
+        3: '⚡ ¡TRIPLE ELIMINACIÓN!',
+        4: '👑 ¡IMPARABLE!',
+        5: '🐉 ¡LEYENDA POKÉMON!'
+      };
+      if (banners[killStreak]) {
+        say(banners[killStreak], 3);
+        snd(880, 0.25, 'square', 0.1, 440);
+      }
+    }
+    return _origHitFinal(f, finalDmg, by);
+  }
+  return _origHitFinal(f, d, by);
+};
+
+// 2. Dibujar números de daño flotantes y radar mejorado en el minimapa
+const _origDrawFinal = draw;
+draw = function() {
+  _origDrawFinal();
+  if (!G || G.over) return;
+
+  const me = G.f;
+  const sc = Math.min(1.2, Math.max(0.7, w / 700));
+
+  // Dibujar textos de daño flotantes
+  for (let i = floatTexts.length - 1; i >= 0; i--) {
+    const ft = floatTexts[i];
+    ft.t += 0.016;
+    ft.y -= 0.7;
+    if (ft.t >= 0.85) {
+      floatTexts.splice(i, 1);
+      continue;
+    }
+    const sx = w / 2 + (ft.x - me.x) * sc;
+    const sy = h / 2 + (ft.y - me.y) * sc;
+    cx.save();
+    cx.globalAlpha = Math.max(0, 1 - ft.t / 0.85);
+    cx.font = (ft.big ? '900 17px' : '800 13px') + ' sans-serif';
+    cx.textAlign = 'center';
+    cx.lineWidth = 3;
+    cx.strokeStyle = '#000';
+    cx.strokeText(ft.txt, sx, sy);
+    cx.fillStyle = ft.col;
+    cx.fillText(ft.txt, sx, sy);
+    cx.restore();
+  }
+
+  // Radar en el minimapa para compañeros vivos (verde) y caídos pidiendo rescate (rojo/verde parpadeante)
+  const z = 100, x0 = w - z - 10, y0 = 10, k = z / WD;
+  PE.forEach(p => {
+    if (p.u === MYID) return;
+    const px = x0 + (p.downed ? (p.dx || p.x) : p.x) * k;
+    const py = y0 + (p.downed ? (p.dy || p.y) : p.y) * k;
+    cx.save();
+    if (p.downed) {
+      const pulse = 4 + Math.sin(Date.now() / 120) * 2.5;
+      cx.strokeStyle = '#ff3b30';
+      cx.lineWidth = 2;
+      cx.beginPath();
+      cx.arc(px, py, pulse, 0, 7);
+      cx.stroke();
+      cx.fillStyle = '#4cd964';
+      cx.fillRect(px - 2, py - 2, 4, 4);
+    } else if (p.hp > 0) {
+      cx.fillStyle = '#4cd964';
+      cx.beginPath();
+      cx.arc(px, py, 4, 0, 7);
+      cx.fill();
+      cx.strokeStyle = '#fff';
+      cx.lineWidth = 1;
+      cx.stroke();
+    }
+    cx.restore();
+  });
+};
+
+// 3. Botón de Regalo Diario (+150 PokeCoins cada 24 horas) en el menú principal
+function checkDailyGift() {
+  const promo = document.querySelector('.promo');
+  if (!promo || $('daily-btn')) return;
+  promo.insertAdjacentHTML('beforeend', '<button id="daily-btn" style="margin-top:6px;padding:6px 10px;font-size:11px;width:100%;background:#fff200;color:#111;border-radius:6px;box-shadow:none;transform:none">🎁 REGALO DIARIO (+150 🪙)</button>');
+  const btn = $('daily-btn');
+  const updateBtn = () => {
+    const last = +(localStorage.getItem('pr_daily') || 0);
+    const left = 86400000 - (Date.now() - last);
+    if (left <= 0) {
+      btn.disabled = false;
+      btn.textContent = '🎁 RECLAMAR +150 🪙 DIARIOS';
+    } else {
+      btn.disabled = true;
+      const hrs = Math.ceil(left / 3600000);
+      btn.textContent = '⏳ Regalo en ' + hrs + 'h';
+    }
+  };
+  btn.onclick = () => {
+    const last = +(localStorage.getItem('pr_daily') || 0);
+    if (Date.now() - last < 86400000) return;
+    localStorage.setItem('pr_daily', String(Date.now()));
+    S.coins += 150;
+    save();
+    menu();
+    snd(880, 0.2, 'square', 0.1, 400);
+    tst('🎉 ¡Recibiste 150 PokeCoins diarios!');
+    updateBtn();
+  };
+  updateBtn();
+}
+setInterval(checkDailyGift, 1000);
+/* === PAQUETE FINAL: POKÉBALLS EN MAPA, CHAT RÁPIDO EN PARTIDA Y PROYECTILES DE GRUPO === */
+document.body.insertAdjacentHTML('beforeend', `
+  <div id="qchat-bar" style="position:fixed;left:12px;bottom:110px;z-index:8;display:none;flex-direction:column;gap:4px">
+    <button class="g" style="padding:6px 10px;font-size:11px;margin:0;transform:none;box-shadow:none" onclick="sendQuickPing('🆘 ¡Ayuda!')">🆘 Ayuda</button>
+    <button class="g" style="padding:6px 10px;font-size:11px;margin:0;transform:none;box-shadow:none" onclick="sendQuickPing('⚡ ¡Vamos!')">⚡ Vamos</button>
+    <button class="g" style="padding:6px 10px;font-size:11px;margin:0;transform:none;box-shadow:none" onclick="sendQuickPing('⚠️ ¡Cuidado!')">⚠️ Cuidado</button>
+  </div>
+`);
+
+let myQuickPing = null;
+window.sendQuickPing = function(txt) {
+  myQuickPing = { txt, ts: Date.now() };
+  if (G && G.f && G.f[0]) {
+    G.f[0].ei = txt;
+    G.f[0].emt = 3.0;
+  }
+  snd(780, 0.1, 'sine', 0.08, 200);
+};
+
+// Mostrar barra de avisos rápidos solo durante la partida y sincronizar pings del grupo
+setInterval(() => {
+  const inMatch = G && !G.over && !downed && $('atk').style.display === 'block';
+  $('qchat-bar').style.display = inMatch ? 'flex' : 'none';
+
+  if (inMatch && R && myQuickPing && Date.now() - myQuickPing.ts < 3000) {
+    R.presence({ qping: myQuickPing });
+  }
+
+  // Mostrar globo de aviso de compañeros en pantalla
+  if (inMatch) {
+    PE.forEach(p => {
+      if (p.u !== MYID && p.qping && Date.now() - p.qping.ts < 3000) {
+        addFloat(p.x, p.y - 45, p.n + ': ' + p.qping.txt, '#4fc3ff', false);
+      }
+    });
+  }
+}, 400);
+
+// Dibujar Pokéballs y Superballs girando ligeramente en lugar de cajas cuadradas
+const _drawWithBalls = draw;
+draw = function() {
+  _drawWithBalls();
+  if (!G || G.over) return;
+  const me = G.f[0];
+  const sc = Math.min(1.2, Math.max(0.7, w / 700));
+  const pulse = Math.sin(Date.now() / 220) * 1.5;
+
+  cx.save();
+  cx.translate(w / 2, h / 2);
+  cx.scale(sc, sc);
+  cx.translate(-me.x, -me.y);
+
+  G.ch.forEach((k, idx) => {
+    // Solo dibujar si está dentro de la cámara visible
+    if (Math.abs(k.x - me.x) > w || Math.abs(k.y - me.y) > h) return;
+    const isSuper = idx % 5 === 0;
+    const r = 11 + pulse * 0.4;
+
+    // Mitad superior (Roja o Azul Superball)
+    cx.fillStyle = isSuper ? '#2b8ed1' : '#e82820';
+    cx.beginPath();
+    cx.arc(k.x, k.y, r, Math.PI, 0);
+    cx.fill();
+
+    // Mitad inferior blanca
+    cx.fillStyle = '#ffffff';
+    cx.beginPath();
+    cx.arc(k.x, k.y, r, 0, Math.PI);
+    cx.fill();
+
+    // Contorno y franja central negra
+    cx.strokeStyle = '#141418';
+    cx.lineWidth = 2.5;
+    cx.beginPath();
+    cx.arc(k.x, k.y, r, 0, Math.PI * 2);
+    cx.moveTo(k.x - r, k.y);
+    cx.lineTo(k.x + r, k.y);
+    cx.stroke();
+
+    // Botón central brillante
+    cx.fillStyle = '#fff';
+    cx.beginPath();
+    cx.arc(k.x, k.y, 4, 0, Math.PI * 2);
+    cx.fill();
+    cx.stroke();
+  });
+
+  cx.restore();
+};
+/* === MENÚ DE CONFIGURACIÓN AVANZADO (⚙️) CON 14 AJUSTES === */
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+  #cfg { z-index: 30; background: linear-gradient(160deg, #162238, #0b1324); overflow-y: auto; }
+  .cfg-box { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
+  .cfg-sec { font-size: 12px; font-weight: 900; color: #fff200; letter-spacing: 1px; margin: 10px 0 2px; text-transform: uppercase; border-bottom: 1px solid #fff20044; padding-bottom: 3px; }
+  .cfg-card { background: #ffffff14; border: 1px solid #ffffff2a; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .cfg-card select { padding: 7px 10px; border-radius: 6px; border: 0; font-weight: 800; background: #fff200; color: #111; font-size: 12px; max-width: 170px; }
+  .cfg-card input[type=range] { width: 110px; accent-color: #fff200; }
+  .cfg-btn { margin: 0; padding: 7px 14px; font-size: 12px; transform: none; box-shadow: none; min-width: 64px; }
+  body.fx-gb { filter: sepia(100%) hue-rotate(55deg) saturate(260%) contrast(115%) brightness(92%); }
+  body.fx-gbc { filter: saturate(145%) contrast(112%); }
+  body.fx-crt { filter: contrast(120%) brightness(95%); }
+  body.fx-crt::after { content: ""; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 1px, transparent 1px, transparent 3px); pointer-events: none; z-index: 9999; }
+  body.fx-cb1 { filter: contrast(115%) saturate(135%) hue-rotate(-25deg); }
+  body.fx-cb2 { filter: contrast(115%) saturate(135%) hue-rotate(35deg); }
+  body.fx-cb3 { filter: contrast(120%) hue-rotate(155deg) saturate(120%); }
+</style>
+`);
+
+document.body.insertAdjacentHTML('beforeend', `
+<div class="scr" id="cfg">
+  <div class="hd"><h1 id="cfg-title">⚙️ CONFIGURACIÓN</h1></div>
+  <div class="cfg-box">
+
+    <div class="cfg-sec" id="sec-gen">🌐 GENERAL E IDIOMA</div>
+    <div class="cfg-card">
+      <div><b id="lbl-lang">Idioma / Language</b><br><small id="sub-lang">Español, English o Português</small></div>
+      <select id="opt-lang">
+        <option value="es">🇪🇸 Español</option>
+        <option value="en">🇺🇸 English</option>
+        <option value="pt">🇧🇷 Português</option>
+      </select>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-fps">Mostrar Contador FPS</b><br><small id="sub-fps">Rendimiento en tiempo real</small></div>
+      <button class="g cfg-btn" id="opt-fps">NO</button>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-full">Pantalla Completa</b><br><small id="sub-full">Maximizar ventana de juego</small></div>
+      <button class="g cfg-btn" id="opt-full">ACTIVAR</button>
+    </div>
+
+    <div class="cfg-sec" id="sec-vis">🎨 GRÁFICOS Y ACCESIBILIDAD</div>
+    <div class="cfg-card">
+      <div><b id="lbl-vis">Filtro de Pantalla</b><br><small id="sub-vis">Game Boy Verde, CRT o Daltonismo</small></div>
+      <select id="opt-vis">
+        <option value="none">Normal (32-Bits)</option>
+        <option value="gb">🟩 Game Boy Clásico (Verde)</option>
+        <option value="gbc">🌈 Game Boy Color (Vibrante)</option>
+        <option value="crt">📺 Televisor Retro (Líneas CRT)</option>
+        <option value="cb1">👁️ Daltónico: Protanopía (Rojo)</option>
+        <option value="cb2">👁️ Daltónico: Deuteranopía (Verde)</option>
+        <option value="cb3">👁️ Daltónico: Tritanopía (Azul)</option>
+      </select>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-zoom">Zoom de Cámara</b><br><small id="sub-zoom">Alejar o acercar vista en batalla</small></div>
+      <select id="opt-zoom">
+        <option value="0.85">Alejado (Más visión)</option>
+        <option value="1">Normal (100%)</option>
+        <option value="1.2">Cercano (120%)</option>
+      </select>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-shd">Sombras y Brillos</b><br><small id="sub-shd">Efectos de luz en ataques y skins</small></div>
+      <button class="g cfg-btn" id="opt-shd">SÍ</button>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-dmg">Números de Daño</b><br><small id="sub-dmg">Mostrar daño flotante y críticos</small></div>
+      <button class="g cfg-btn" id="opt-dmg">SÍ</button>
+    </div>
+
+    <div class="cfg-sec" id="sec-ctl">🎮 CONTROLES Y JUGABILIDAD</div>
+    <div class="cfg-card">
+      <div><b id="lbl-joy">Tamaño del Joystick</b><br><small id="sub-joy">Ajuste táctil para celular</small></div>
+      <select id="opt-joy">
+        <option value="35">Pequeño</option>
+        <option value="45">Normal</option>
+        <option value="60">Grande</option>
+      </select>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-aim">Auto-Apuntado Inteligente</b><br><small id="sub-aim">Apuntar al rival más cercano</small></div>
+      <button class="g cfg-btn" id="opt-aim">SÍ</button>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-vib">Vibración Háptica</b><br><small id="sub-vib">Vibrar al golpear o recibir daño</small></div>
+      <button class="g cfg-btn" id="opt-vib">SÍ</button>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-qchat">Botones de Chat Rápido</b><br><small id="sub-qchat">Mostrar Ayuda/Vamos en batalla</small></div>
+      <button class="g cfg-btn" id="opt-qchat">SÍ</button>
+    </div>
+
+    <div class="cfg-sec" id="sec-aud">🔊 AUDIO</div>
+    <div class="cfg-card">
+      <div><b id="lbl-snd">Música y Efectos</b><br><small id="sub-snd">Sonido 16-bits del juego</small></div>
+      <button class="g cfg-btn" id="opt-snd">SÍ</button>
+    </div>
+    <div class="cfg-card">
+      <div><b id="lbl-vol">Volumen General</b><br><small id="sub-vol">Intensidad del sonido</small></div>
+      <input type="range" id="opt-vol" min="0" max="100" value="90">
+    </div>
+
+    <div class="cfg-card" style="border-color:#ff525266;margin-top:6px">
+      <div><b style="color:#ff8a8a" id="lbl-rst">Restablecer Ajustes</b><br><small>Volver a la configuración de fábrica</small></div>
+      <button class="g cfg-btn" id="opt-rst" style="background:#d82820">RESET</button>
+    </div>
+
+  </div>
+  <button class="g" id="cfg-back" style="margin-top:8px">Volver</button>
+</div>
+<div id="fps-hud" style="position:fixed;left:10px;top:66px;z-index:9;background:#0009;color:#4cd964;font-family:monospace;font-size:11px;font-weight:900;padding:2px 6px;border-radius:4px;display:none;pointer-events:none">60 FPS</div>
+`);
+
+SC.push('cfg');
+
+const DEFAULT_CFG = {
+  lang: 'es', vis: 'none', zoom: '1', shd: true, dmg: true,
+  joy: '45', aim: true, vib: true, qchat: true, fps: false, vol: 90
+};
+let CFG = Object.assign({}, DEFAULT_CFG, J('pr_cfg', {}));
+const saveCfg = () => W('pr_cfg', CFG);
+
+const LANG_MAP = {
+  es: {
+    play: 'JUGAR', shop: 'TIENDA', locker: 'CASILLERO', modes: 'MODOS',
+    friends: 'AMIGOS', pass: 'PASES', quests: 'MISIONES', comp: 'COMPETIR',
+    treasure: 'TESORO', back: 'Volver', cfgTitle: '⚙️ CONFIGURACIÓN',
+    yes: 'SÍ', no: 'NO', create: 'Crear', join: 'Unirse'
+  },
+  en: {
+    play: 'PLAY', shop: 'SHOP', locker: 'LOCKER', modes: 'MODES',
+    friends: 'FRIENDS', pass: 'PASS', quests: 'QUESTS', comp: 'COMPETE',
+    treasure: 'TREASURE', back: 'Back', cfgTitle: '⚙️ SETTINGS',
+    yes: 'ON', no: 'OFF', create: 'Create', join: 'Join'
+  },
+  pt: {
+    play: 'JOGAR', shop: 'LOJA', locker: 'VESTIÁRIO', modes: 'MODOS',
+    friends: 'AMIGOS', pass: 'PASSES', quests: 'MISSÕES', comp: 'COMPETIR',
+    treasure: 'TESOURO', back: 'Voltar', cfgTitle: '⚙️ CONFIGURAÇÕES',
+    yes: 'SIM', no: 'NÃO', create: 'Criar', join: 'Entrar'
+  }
+};
+
+function applySettings() {
+  // 1. Filtros visuales
+  document.body.classList.remove('fx-gb', 'fx-gbc', 'fx-crt', 'fx-cb1', 'fx-cb2', 'fx-cb3');
+  if (CFG.vis && CFG.vis !== 'none') document.body.classList.add('fx-' + CFG.vis);
+
+  // 2. Volumen maestro
+  if (MG && AC) MG.gain.value = (CFG.vol / 100) * 0.9;
+
+  // 3. Contador FPS
+  if ($('fps-hud')) $('fps-hud').style.display = CFG.fps ? 'block' : 'none';
+
+  // 4. Idioma
+  const L = LANG_MAP[CFG.lang] || LANG_MAP.es;
+  if ($('cfg-title')) $('cfg-title').textContent = L.cfgTitle;
+  if ($('cfg-back')) $('cfg-back').textContent = L.back;
+  if ($('play') && (!$('play').disabled)) $('play').textContent = L.play;
+  if ($('ts')) $('ts').textContent = L.shop;
+  if ($('tl')) $('tl').textContent = L.locker;
+  if ($('tmo')) $('tmo').textContent = L.modes;
+  if ($('tf')) $('tf').textContent = L.friends;
+  if ($('pnew')) $('pnew').textContent = L.create;
+  if ($('pjoin')) $('pjoin').textContent = L.join;
+
+  document.querySelectorAll('#gnav .tb').forEach(b => {
+    const t = b.textContent.trim();
+    if (['JUGAR', 'PLAY', 'JOGAR'].includes(t)) b.textContent = L.play;
+    else if (['TESORO', 'TREASURE', 'TESOURO'].includes(t)) b.textContent = L.treasure;
+    else if (['PASES', 'PASS', 'PASSES'].includes(t)) b.textContent = L.pass;
+    else if (['MISIONES', 'QUESTS', 'MISSÕES'].includes(t)) b.textContent = L.quests;
+    else if (['COMPETIR', 'COMPETE', 'COMPETIR'].includes(t)) b.textContent = L.comp;
+  });
+
+  // 5. Sincronizar controles UI
+  $('opt-lang').value = CFG.lang;
+  $('opt-vis').value = CFG.vis;
+  $('opt-zoom').value = CFG.zoom;
+  $('opt-joy').value = CFG.joy;
+  $('opt-vol').value = CFG.vol;
+  $('opt-fps').textContent = CFG.fps ? L.yes : L.no;
+  $('opt-shd').textContent = CFG.shd ? L.yes : L.no;
+  $('opt-dmg').textContent = CFG.dmg ? L.yes : L.no;
+  $('opt-aim').textContent = CFG.aim ? L.yes : L.no;
+  $('opt-vib').textContent = CFG.vib ? L.yes : L.no;
+  $('opt-qchat').textContent = CFG.qchat ? L.yes : L.no;
+  $('opt-snd').textContent = !MUTE ? L.yes : L.no;
+}
+
+// Reemplazar la lupa 🔍 por la tuerquita ⚙️
+(function replaceMagnifierWithGear() {
+  const nav = $('gnav');
+  if (!nav) return;
+  nav.querySelectorAll('span').forEach(sp => {
+    if (sp.textContent.includes('🔍')) {
+      sp.textContent = '⚙️';
+      sp.title = 'Configuración';
+      sp.style.cursor = 'pointer';
+      sp.style.fontSize = '17px';
+      sp.style.padding = '2px 6px';
+sp.onclick = () => { applySettings(); go('cfg'); };
+}
+});
+})();
+// Eventos de las 14 opciones
+$('opt-lang').onchange = e => { CFG.lang = e.target.value; saveCfg(); applySettings(); };
+$('opt-vis').onchange = e => { CFG.vis = e.target.value; saveCfg(); applySettings(); };
+$('opt-zoom').onchange = e => { CFG.zoom = e.target.value; saveCfg(); };
+$('opt-joy').onchange = e => { CFG.joy = e.target.value; saveCfg(); };
+$('opt-vol').oninput = e => { CFG.vol = +e.target.value; saveCfg(); applySettings(); };
+$('opt-fps').onclick = () => { CFG.fps = !CFG.fps; saveCfg(); applySettings(); };
+$('opt-shd').onclick = () => { CFG.shd = !CFG.shd; saveCfg(); applySettings(); };
+$('opt-dmg').onclick = () => { CFG.dmg = !CFG.dmg; saveCfg(); applySettings(); };
+$('opt-aim').onclick = () => { CFG.aim = !CFG.aim; saveCfg(); applySettings(); };
+$('opt-vib').onclick = () => { CFG.vib = !CFG.vib; saveCfg(); applySettings(); if (CFG.vib && navigator.vibrate) navigator.vibrate(60); };
+$('opt-qchat').onclick = () => { CFG.qchat = !CFG.qchat; saveCfg(); applySettings(); };
+$('opt-snd').onclick = () => { MUTE = !MUTE; if ($('mus')) $('mus').textContent = MUTE ? '🔇' : '♫'; applySettings(); };
+$('opt-full').onclick = () => {
+if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+else document.exitFullscreen().catch(() => {});
+};
+$('opt-rst').onclick = () => {
+CFG = Object.assign({}, DEFAULT_CFG);
+MUTE = false;
+saveCfg();
+applySettings();
+tst('⚙️ Configuración restablecida');
+};
+$('cfg-back').onclick = () => go('menu');
+// Aplicar Zoom, Sombras, Auto-apuntado, Chat Rápido y FPS en tiempo real
+const _origAddFloat = addFloat;
+addFloat = function(x, y, txt, col, big) {
+if (!CFG.dmg) return;
+_origAddFloat(x, y, txt, col, big);
+};
+const _origHitVib = hit;
+hit = function(f, d, by) {
+if (CFG.vib && navigator.vibrate && d > 1) {
+if (!f.bot) navigator.vibrate(80);
+else if (by && !by.bot && f.hp - d <= 0) navigator.vibrate();
+}
+return _origHitVib(f, d, by);
+};
+// Desactivar auto-apuntado si el jugador lo apaga en ajustes
+const _origNear = near;
+near = function(f, list) {
+if (!f.bot && !CFG.aim) return [null, 1e9];
+return _origNear(f, list);
+};
+// Medidor de FPS real
+let fpsFrames = 0, fpsLast = performance.now();
+function fpsTick(now) {
+fpsFrames++;
+if (now - fpsLast >= 500) {
+if (CFG.fps && $('fps-hud')) {
+$('fps-hud').textContent = Math.round((fpsFrames * 1000) / (now - fpsLast)) + ' FPS';
+}
+fpsFrames = 0;
+fpsLast = now;
+}
+requestAnimationFrame(fpsTick);
+}
+requestAnimationFrame(fpsTick);
+// Controlar visibilidad del chat rápido según ajuste
+setInterval(() => {
+if (!CFG.qchat && $('qchat-bar')) $('qchat-bar').style.display = 'none';
+}, 250);
+applySettings();
 go('menu');
 </script>
 <script src="config.js"></script>
