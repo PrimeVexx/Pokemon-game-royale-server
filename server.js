@@ -38,6 +38,22 @@ app.get('/api/save',auth,(q,r)=>r.json({data:q.u.save}));
 app.put('/api/save',auth,(q,r)=>{q.u.save=q.body;persist();r.json({ok:1})});
 app.get('/api/friends',auth,(q,r)=>r.json(q.u.friends.map(id=>DB.users[id]).filter(Boolean).map(f=>({id:f.id,name:f.name,online:online.has(f.id)}))));
 app.post('/api/friends',auth,(q,r)=>{const f=Object.values(DB.users).find(x=>x.code==String(q.body.code||'').trim().toUpperCase());if(!f||f.id==q.u.id)return r.status(404).json({error:'no'});for(const[a,b]of[[q.u,f],[f,q.u]])if(!a.friends.includes(b.id))a.friends.push(b.id);persist();r.json({ok:1})});
+app.get('/api/leaderboard', (q, r) => {
+  const list = Object.values(DB.users).map(u => {
+    const st = (u.save && u.save.st) || {};
+    return {
+      id: u.id,
+      name: u.name || 'Entrenador',
+      brw: st.brw || 0,
+      brk: st.brk || 0,
+      zd: st.zd || 0,
+      zk: st.zk || 0,
+      rqw: st.rqw || 0,
+      rqg: st.rqg || 0
+    };
+  });
+  r.json(list);
+});
 
 app.use(express.static(path.join(__dirname,'public')));
 const srv=http.createServer(app),wss=new WebSocketServer({server:srv,path:'/ws'}),rooms=new Map();
