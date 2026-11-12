@@ -2498,7 +2498,7 @@ end = function(place) {
   }
   if (place === 1 && R) myWinSignal = Date.now();
 
-  const notes = place === 1 ? [523, 659, 784, 1047, 1319] 
+  const notes = place === 1 ? [523, 659, 784, 1047, 1319] :;
   notes.forEach((q, i) => setTimeout(() => snd(q, 0.25, 'square', 0.09), i * 150));
 
   const me = G.f[0] || { k: 0 };
