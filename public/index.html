@@ -2395,14 +2395,9 @@ G = { f: new Array(mk(S.sel, MYN || 'Tú', 0, sk)), p: new Array(), ch: new Arra
   ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue'].forEach(s => {
     if ($(s)) $(s).classList.remove('on');
   });
-  say(S.mode === 'br' ? '✈️ ¡10 jugadores en el avión! Pulsa SALTAR' : '⚡ ¡Comienza la batalla!', 4);
-};
-
-// 3. Función de daño y eliminación limpia (sin llamadas rotas a vibrate ni bucles)
 hit = function(f, d, by) {
   if (!f || !f.alive || !G || G.over) return;
 
-  // Daño flotante y crítico (15% probabilidad)
   let finalDmg = d;
   if (d > 1 && by) {
     const isCrit = Math.random() < 0.15;
@@ -2419,9 +2414,9 @@ hit = function(f, d, by) {
   }
 
   if (finalDmg > 1) {
-  new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue').forEach(s => {
-    if ($(s)) $(s).classList.remove('on');
-  });
+    if (!f.bot) {
+      snd(130, 0.12, 'sawtooth', 0.09, -60);
+      if (CFG && CFG.vib && navigator.vibrate) navigator.vibrate(70);
     } else if (by && !by.bot) {
       snd(320, 0.06, 'square', 0.06);
     }
