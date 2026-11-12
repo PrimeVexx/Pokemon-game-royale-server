@@ -2293,6 +2293,64 @@ requestAnimationFrame(fpsTick);
 setInterval(() => { if (!CFG.qchat && $('qchat-bar')) $('qchat-bar').style.display = 'none'; }, 250);
 
 applySettings();
+	/* === PARCHE FINAL: 10 JUGADORES REALES EN MAPA + VICTORIA SIN CONGELARSE === */
+const VALID_SPOTS = [, [1400, 320], [2400, 400], [450, 1350], [1400, 1400],
+, [400, 2350], [1400, 2400], [2350, 2350], [950, 950]
+];
+
+let winHandled = false;
+
+// 1. Asegurar 10 participantes exactos (jugadores humanos + bots hasta 10)
+const _fixStart10 = start;
+start = function() {
+  winHandled = false;
+  myWinSignal = 0;
+  _fixStart10();
+
+  if (S.mode === 'br' && G && G.f) {
+    const rng = seededRng(MATCH_SEED);
+    const names = NAMES.slice().sort(() => rng() - 0.5);
+    const ks = Object.keys(MON).filter(k => !MON[k].pass);
+    const mates = PE.filter(p => p && p.u && p.u !== MYID);
+    const neededBots = Math.max(0, 9 - mates.length);
+
+    G.f.length = 1;
+    for (let i = 0; i < neededBots; i++) {
+      const monName = ks[Math.floor(rng() * ks.length)];
+      const bot = mk(monName, names[i % names.length], 1, '');
+      const sp = VALID_SPOTS[(i + 1) % VALID_SPOTS.length];
+      bot.onp = 1;
+      bot.air = 0;
+      bot.tx = sp[0] + (rng() - 0.5) * 100;
+      bot.ty = sp[1] + (rng() - 0.5) * 100;
+      bot.jt = 1.5 + ((i * 1.2) % 11);
+      G.f.push(bot);
+    }
+  }
+};
+
+// 2. Evitar que la pantalla de victoria se congele en bucle
+const _fixEnd = end;
+end = function(place) {
+  if (winHandled) return;
+  winHandled = true;
+  G.over = 1;
+  if (place === 1 && R) {
+    myWinSignal = Date.now();
+  }
+  _fixEnd(place);
+};
+
+const _fixEndRQ = endRQ;
+endRQ = function(win) {
+  if (winHandled) return;
+  winHandled = true;
+  G.over = 1;
+  if (win && R) {
+    myWinSignal = Date.now();
+  }
+  _fixEndRQ(win);
+};
 go('menu');
 </script>
 <script src="config.js"></script>
