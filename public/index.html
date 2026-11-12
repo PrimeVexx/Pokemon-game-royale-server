@@ -2293,22 +2293,57 @@ requestAnimationFrame(fpsTick);
 setInterval(() => { if (!CFG.qchat && $('qchat-bar')) $('qchat-bar').style.display = 'none'; }, 250);
 
 applySettings();
-/* === CORRECCIÓN LIMPIA: 10 JUGADORES EN MAPA + VICTORIA SIN CONGELAMIENTO === */
+/* === CORRECCIÓN LIMPIA: 10 JUGADORES, MONEDAS REALES Y CERO CONGELAMIENTO AL MATAR === */
 const ZONAS_MAPA = [
-  { x: 450,  y: 450  },
-  { x: 1400, y: 400  },
-  { x: 2350, y: 450  },
-  { x: 500,  y: 1400 },
-  { x: 1400, y: 1400 },
-  { x: 2300, y: 1400 },
-  { x: 450,  y: 2350 },
-  { x: 1400, y: 2350 },
-  { x: 2350, y: 2350 },
-  { x: 1000, y: 950  }
+  { x: 440,  y: 440  },
+  { x: 1390, y: 440  },
+  { x: 2340, y: 440  },
+  { x: 440,  y: 1390 },
+  { x: 1390, y: 1390 },
+  { x: 2340, y: 1390 },
+  { x: 440,  y: 2340 },
+  { x: 1390, y: 2340 },
+  { x: 2340, y: 2340 },
+  { x: 1390, y: 915  }
 ];
 
 let partidaTerminada = false;
 
+// 1. Pantalla de emparejamiento hasta 10 jugadores
+queue = function() {
+  if (QT) { clearInterval(QT); QT = null; }
+  const mates = PE.filter(p => p && p.u && p.u !== MYID);
+  const nombres = [MYN || 'Tú', ...mates.map(p => p.n)];
+  const rng = seededRng(MATCH_SEED);
+  const botsPool = NAMES.slice().sort(() => rng() - 0.5);
+  while (nombres.length < 10) {
+    nombres.push(botsPool[nombres.length % botsPool.length]);
+  }
+
+  let mostrados = 1 + mates.length;
+  const renderQ = () => {
+    $('qn').textContent = mostrados + '/10 jugadores';
+    $('ql').innerHTML = nombres.slice(0, mostrados)
+      .map(n => `<span style="background:#ffffff22;padding:5px 10px;border-radius:6px;font-weight:800;font-size:13px">${esc(n)}</span>`)
+      .join('');
+  };
+
+  renderQ();
+  go('queue');
+  QT = setInterval(() => {
+    if (mostrados < 10) {
+      mostrados++;
+      renderQ();
+      snd(520, 0.05, 'sine', 0.05);
+    } else {
+      clearInterval(QT);
+      QT = null;
+      setTimeout(() => start(), 300);
+    }
+  }, 220);
+};
+
+// 2. Inicio de partida con límites 440 / 1390 / 2340
 start = function() {
   partidaTerminada = false;
   winHandled = false;
@@ -2317,8 +2352,8 @@ start = function() {
   spectating = null;
   revTimer = 0;
   revTargetId = null;
-  $('rev-box').style.display = 'none';
-  $('spec-banner').style.display = 'none';
+  if ($('rev-box')) $('rev-box').style.display = 'none';
+  if ($('spec-banner')) $('spec-banner').style.display = 'none';
 
   const rng = seededRng(MATCH_SEED);
   const names = NAMES.slice().sort(() => rng() - 0.5);
@@ -2334,15 +2369,15 @@ start = function() {
     const monName = ks[Math.floor(rng() * ks.length)];
     const bot = mk(monName, names[i % names.length], 1, '');
     const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
-    bot.tx = z.x + Math.round((rng() - 0.5) * 160);
-    bot.ty = z.y + Math.round((rng() - 0.5) * 160);
+    bot.tx = Math.max(440, Math.min(2340, z.x + Math.round((rng() - 0.5) * 120)));
+    bot.ty = Math.max(440, Math.min(2340, z.y + Math.round((rng() - 0.5) * 120)));
     G.f.push(bot);
   }
 
   for (let i = 0; i < 70; i++) {
     const z = ZONAS_MAPA[i % ZONAS_MAPA.length];
-    const cxp = Math.max(80, Math.min(WD - 80, z.x + Math.round((rng() - 0.5) * 500)));
-    const cyp = Math.max(80, Math.min(WD - 80, z.y + Math.round((rng() - 0.5) * 500)));
+    const cxp = Math.max(440, Math.min(2340, z.x + Math.round((rng() - 0.5) * 420)));
+    const cyp = Math.max(440, Math.min(2340, z.y + Math.round((rng() - 0.5) * 420)));
     G.ch.push({ x: cxp, y: cyp });
   }
 
@@ -2353,42 +2388,135 @@ start = function() {
   });
 
   if (typeof STORM === 'function' && G.mode === 'br') {
-    G.zx = 1400; G.zy = 1400; G.zr = 1950;
+    G.zx = 1390; G.zy = 1390; G.zr = 1950;
   }
 
   $('atk').style.display = 'block';
-  ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp'].forEach(s => {
+  ['menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue'].forEach(s => {
     if ($(s)) $(s).classList.remove('on');
   });
   say(S.mode === 'br' ? '✈️ ¡10 jugadores en el avión! Pulsa SALTAR' : '⚡ ¡Comienza la batalla!', 4);
 };
 
+// 3. Función de daño y eliminación limpia (sin llamadas rotas a vibrate ni bucles)
+hit = function(f, d, by) {
+  if (!f || !f.alive || !G || G.over) return;
+
+  // Daño flotante y crítico (15% probabilidad)
+  let finalDmg = d;
+  if (d > 1 && by) {
+    const isCrit = Math.random() < 0.15;
+    if (isCrit) finalDmg = d * 1.5;
+    if (typeof addFloat === 'function') {
+      addFloat(
+        f.x + (Math.random() - 0.5) * 16,
+        f.y - 26,
+        (isCrit ? '💥 ' : '-') + Math.round(finalDmg),
+        isCrit ? '#fff200' : (f.bot ? '#ffffff' : '#ff5252'),
+        isCrit
+      );
+    }
+  }
+
+  if (finalDmg > 1) {
+    if (!f.bot) {
+      snd(130, 0.12, 'sawtooth', 0.09, -60);
+      if (CFG && CFG.vib && navigator.vibrate) navigator.vibrate(70);
+    } else if (by && !by.bot) {
+      snd(320, 0.06, 'square', 0.06);
+    }
+  }
+
+  if (f.sh > 0) {
+    const a = Math.min(f.sh, finalDmg);
+    f.sh -= a;
+    finalDmg -= a;
+  }
+
+  f.hp -= finalDmg;
+
+  // Cuando un personaje llega a 0 PS
+  if (f.hp <= 0 && f.alive) {
+    // Si soy yo y tengo compañeros vivos en grupo, paso a modo espectador
+    if (!f.bot && !downed) {
+      const aliveMates = PE.filter(p => p.u !== MYID && p.hp > 0 && !p.downed);
+      if (aliveMates.length > 0) {
+        f.hp = 1;
+        f.alive = 0;
+        downed = true;
+        spectating = aliveMates[0];
+        $('atk').style.display = 'none';
+        if ($('spec-banner')) $('spec-banner').style.display = 'block';
+        say('💀 ¡Caíste! Espectando a ' + spectating.n + '...', 4);
+        return;
+      }
+    }
+
+    f.alive = 0;
+    f.hp = 0;
+
+    if (by) {
+      by.k = (Number(by.k) || 0) + 1;
+      if (typeof xp === 'function') xp(by, 2);
+      if (!by.bot) {
+        if (typeof mq === 'function') mq('k', 1);
+        if (CFG && CFG.vib && navigator.vibrate) navigator.vibrate(140);
+        const now = Date.now();
+        killStreak = (now - lastKillTs < 12000) ? killStreak + 1 : 1;
+        lastKillTs = now;
+        const banners = {
+          2: '🔥 ¡DOBLE ELIMINACIÓN!',
+          3: '⚡ ¡TRIPLE ELIMINACIÓN!',
+          4: '👑 ¡IMPARABLE!',
+          5: '🐉 ¡LEYENDA POKÉMON!'
+        };
+        say(banners[killStreak] || ('¡Derrotaste a ' + f.n + '!'), 3);
+      }
+      if (typeof KF !== 'undefined') {
+        KF.unshift((by.bot ? by.n : (MYN || 'Tú')) + ' eliminó a ' + f.n);
+        KF.length = Math.min(KF.length, 4);
+      }
+    }
+
+    if (!f.bot) {
+      if (G.mode === 'h' && typeof endH === 'function') endH();
+      else end(alive().length + 1);
+    }
+  }
+};
+
+// 4. Fin de partida limpio con notas válidas y monedas numéricas
 end = function(place) {
   if (partidaTerminada) return;
   partidaTerminada = true;
   if (!G) return;
   G.over = 1;
   mus = 'lobby';
-  mq('g', 1);
-  if (place === 1) {
-    mq('w', 1);
-    if (R) myWinSignal = Date.now();
+  if (typeof mq === 'function') {
+    mq('g', 1);
+    if (place === 1) mq('w', 1);
   }
-  (place === 1 ? [523, 659, 784, 1047, 1319] : [392, 330, 262, 196]).forEach((q, i) => setTimeout(() => snd(q, 0.25, 'square', 0.09), i * 150));
+  if (place === 1 && R) myWinSignal = Date.now();
 
-  const me = G.f;
-  const win = place === 1;
-  const rw = me.k * 8 + Math.max(0, 11 - place) * 3 + (win ? 30 : 0);
-  S.coins += rw;
-  S.xpt = (S.xpt || 0) + rw * 2;
+  const notes = place === 1 ? [523, 659, 784, 1047, 1319] :;
+  notes.forEach((q, i) => setTimeout(() => snd(q, 0.25, 'square', 0.09), i * 150));
+
+  const me = G.f[0] || { k: 0 };
+  const kills = Number(me.k) || 0;
+  const rank = Number(place) || 10;
+  const win = rank === 1;
+  const rw = Math.max(5, kills * 8 + Math.max(0, 11 - rank) * 3 + (win ? 30 : 0));
+
+  S.coins = (Number(S.coins) || 0) + rw;
+  S.xpt = (Number(S.xpt) || 0) + rw * 2;
   const t = S.st = S.st || {};
-  if (win) t.brw = (t.brw || 0) + 1;
-  t.brk = (t.brk || 0) + me.k;
+  if (win) t.brw = (Number(t.brw) || 0) + 1;
+  t.brk = (Number(t.brk) || 0) + kills;
   save();
 
   $('atk').style.display = 'none';
-  $('et').textContent = win ? '🏆 ¡VICTORIA ROYALE!' : 'Puesto #' + place;
-  $('ed').innerHTML = `Eliminaciones: ${me.k}<br>Ganaste <b>${rw} 💰</b> PokeCoins`;
+  $('et').textContent = win ? '🏆 ¡VICTORIA ROYALE!' : 'Puesto #' + rank;
+  $('ed').innerHTML = `Eliminaciones: ${kills}<br>Ganaste <b>${rw} 💰</b> PokeCoins`;
   setTimeout(() => show('end'), 600);
 };
 go('menu');
