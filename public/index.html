@@ -2419,9 +2419,9 @@ hit = function(f, d, by) {
   }
 
   if (finalDmg > 1) {
-    new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue').forEach(s => {
-      snd(130, 0.12, 'sawtooth', 0.09, -60);
-      if (CFG && CFG.vib && navigator.vibrate) navigator.vibrate(70);
+  new Array('menu', 'shop', 'end', 'inv', 'modes', 'fr', 'cfg', 'pas', 'mis', 'tes', 'cmp', 'queue').forEach(s => {
+    if ($(s)) $(s).classList.remove('on');
+  });
     } else if (by && !by.bot) {
       snd(320, 0.06, 'square', 0.06);
     }
