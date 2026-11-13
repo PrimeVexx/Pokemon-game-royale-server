@@ -3241,6 +3241,65 @@ rmodes = function() {
     };
   });
 };
+/* === MOSTRAR LAS 4 TARJETAS EN MODOS DE JUEGO === */
+function mostrarModos() {
+  const scr = $('modes');
+  if (!scr) return;
+  const box = scr.querySelector('.ml') || $('ml');
+  if (!box) return;
+
+  box.style.display = 'flex';
+  box.style.flexWrap = 'wrap';
+  box.style.justifyContent = 'center';
+  box.style.gap = '12px';
+
+  const lista = new Array();
+  lista.push({ id: 'br', tag: '', title: 'BATTLE ROYALE', sub: 'Grupo · 10 jugadores', desc: 'Salta del avión, abre cofres y sé el último en pie.', mon: 'Pikachu', bg: 'linear-gradient(135deg,#2a3a6a,#1a2342)' });
+  lista.push({ id: 'h',  tag: '', title: 'HORDA ZOMBIE', sub: 'Infinito · Sobrevive los días', desc: 'Oleadas de zombis cada vez más fuertes. Jefe cada 5 días.', mon: 'Gengar', bg: 'linear-gradient(135deg,#4a206a,#241038)' });
+  lista.push({ id: 'rq', tag: 'EVENTO', title: 'EVENTO RAYQUAZA', sub: 'Evento · Jefe final · 3:20 min', desc: 'Derrota a Rayquaza antes de que se acabe el tiempo.', mon: 'Rayquaza', bg: 'linear-gradient(135deg,#186a48,#0d3826)' });
+  lista.push({ id: 'pen', tag: 'NUEVO', title: '⚽ FÚTBOL PENALES', sub: '1v1 · 5 tiros + 5 paradas', desc: 'Juega contra el bot o contra tu amigo en grupo.', mon: 'Cinderace', bg: 'linear-gradient(135deg,#1e6b38,#0d381c)' });
+
+  box.innerHTML = lista.map(m => {
+    const sel = S.mode === m.id;
+    return `<div class="mc ${sel ? 'on' : ''}" style="min-width:205px;max-width:225px">
+      <div class="top" style="background:${m.bg}">
+        ${m.tag ? `<span class="tag" style="background:#4cd964;color:#111">${m.tag}</span>` : ''}
+        <canvas id="mico-${m.id}" width="90" height="90"></canvas>
+      </div>
+      <div class="bd">
+        <h3>${m.title}</h3>
+        <small>${m.sub}</small>
+        <p>${m.desc}</p>
+        <button data-pick="${m.id}">${sel ? '✓ SELECCIONADO' : 'ELEGIR'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  lista.forEach(m => {
+    try {
+      const cv = $('mico-' + m.id);
+      if (cv) drawSpr(cv.getContext('2d'), MON[m.mon] ? m.mon : 'Pikachu', 12, 8, 5.5, null);
+    } catch (e) {}
+  });
+
+  box.querySelectorAll('[data-pick]').forEach(btn => {
+    btn.onclick = () => {
+      S.mode = btn.dataset.pick;
+      menu();
+      go('menu');
+      tst('Modo seleccionado');
+    };
+  });
+}
+
+rmodes = mostrarModos;
+if ($('tmo')) $('tmo').onclick = () => { mostrarModos(); go('modes'); };
+document.querySelectorAll('#gnav .tb').forEach(b => {
+  if (b.textContent.includes('MODOS') || b.dataset.scr === 'modes') {
+    b.onclick = () => { mostrarModos(); go('modes'); };
+  }
+});
+
 go('menu');
 </script>
 <script src="config.js"></script>
