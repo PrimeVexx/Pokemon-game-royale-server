@@ -3241,17 +3241,20 @@ rmodes = function() {
     };
   });
 };
-/* === MOSTRAR LAS 4 TARJETAS EN MODOS DE JUEGO === */
+/* === MOSTRAR LAS 4 TARJETAS EN MODOS DE JUEGO (CONTENEDOR PROPIO) === */
 function mostrarModos() {
   const scr = $('modes');
   if (!scr) return;
-  const box = scr.querySelector('.ml') || $('ml');
-  if (!box) return;
 
-  box.style.display = 'flex';
-  box.style.flexWrap = 'wrap';
-  box.style.justifyContent = 'center';
-  box.style.gap = '12px';
+  let box = $('modos-grid');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'modos-grid';
+    box.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:14px;width:100%;max-width:980px;margin:14px auto;z-index:5';
+    const volverBtn = scr.querySelector('button');
+    if (volverBtn) scr.insertBefore(box, volverBtn);
+    else scr.appendChild(box);
+  }
 
   const lista = new Array();
   lista.push({ id: 'br', tag: '', title: 'BATTLE ROYALE', sub: 'Grupo · 10 jugadores', desc: 'Salta del avión, abre cofres y sé el último en pie.', mon: 'Pikachu', bg: 'linear-gradient(135deg,#2a3a6a,#1a2342)' });
@@ -3261,16 +3264,16 @@ function mostrarModos() {
 
   box.innerHTML = lista.map(m => {
     const sel = S.mode === m.id;
-    return `<div class="mc ${sel ? 'on' : ''}" style="min-width:205px;max-width:225px">
-      <div class="top" style="background:${m.bg}">
-        ${m.tag ? `<span class="tag" style="background:#4cd964;color:#111">${m.tag}</span>` : ''}
+    return `<div class="mc ${sel ? 'on' : ''}" style="min-width:205px;max-width:225px;background:#101935;border:2px solid ${sel ? '#fff200' : '#ffffff28'};border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+      <div class="top" style="background:${m.bg};height:110px;display:flex;align-items:center;justify-content:center;position:relative">
+        ${m.tag ? `<span class="tag" style="position:absolute;top:8px;left:8px;background:#4cd964;color:#111;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:900">${m.tag}</span>` : ''}
         <canvas id="mico-${m.id}" width="90" height="90"></canvas>
       </div>
-      <div class="bd">
-        <h3>${m.title}</h3>
-        <small>${m.sub}</small>
-        <p>${m.desc}</p>
-        <button data-pick="${m.id}">${sel ? '✓ SELECCIONADO' : 'ELEGIR'}</button>
+      <div class="bd" style="padding:12px;text-align:left;display:flex;flex-direction:column;gap:6px;flex:1">
+        <h3 style="margin:0;font-size:15px;color:#fff">${m.title}</h3>
+        <small style="color:#a8b8d8;font-size:11px">${m.sub}</small>
+        <p style="margin:0;font-size:12px;color:#dce6f7;flex:1">${m.desc}</p>
+        <button data-pick="${m.id}" style="margin-top:8px;width:100%">${sel ? '✓ SELECCIONADO' : 'ELEGIR'}</button>
       </div>
     </div>`;
   }).join('');
@@ -3287,19 +3290,17 @@ function mostrarModos() {
       S.mode = btn.dataset.pick;
       menu();
       go('menu');
-      tst('Modo seleccionado');
+      tst('Modo seleccionado: ' + btn.dataset.pick.toUpperCase());
     };
   });
 }
 
 rmodes = mostrarModos;
-if ($('tmo')) $('tmo').onclick = () => { mostrarModos(); go('modes'); };
-document.querySelectorAll('#gnav .tb').forEach(b => {
-  if (b.textContent.includes('MODOS') || b.dataset.scr === 'modes') {
-    b.onclick = () => { mostrarModos(); go('modes'); };
+setInterval(() => {
+  if ($('modes') && $('modes').classList.contains('on') && (!$('modos-grid') || !$('modos-grid').innerHTML)) {
+    mostrarModos();
   }
-});
-
+}, 250);
 go('menu');
 </script>
 <script src="config.js"></script>
