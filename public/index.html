@@ -3463,7 +3463,7 @@ document.addEventListener('click', e => {
     const chests = new Array();
     for (let i = 0; i < 70; i++) {
       const z = ZONAS_SYNC[i % ZONAS_SYNC.length];
-      const isArceusChest = rng() < 0.001;
+      const isArceusChest = rng() < 15;
       chests.push({
         x: Math.max(440, Math.min(2340, z.x + Math.round((rng() - 0.5) * 420))),
         y: Math.max(440, Math.min(2340, z.y + Math.round((rng() - 0.5) * 420))),
