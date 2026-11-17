@@ -3301,10 +3301,26 @@ setInterval(() => {
     mostrarModos();
   }
 }, 250);
-if ($('lg')) { $('lg').classList.remove('on'); $('lg').style.display = 'none'; }
-if ($('menu')) { $('menu').style.display = 'flex'; $('menu').classList.add('on'); }
+/* === BARRA SUPERIOR VISIBLE + ABRIR CUENTAS AL HACER CLIC === */
+if ($('gnav')) $('gnav').style.display = 'flex';
+if ($('lg')) {
+  $('lg').classList.remove('on');
+  $('lg').style.display = '';
+}
 if (typeof menu === 'function') menu();
 go('menu');
+
+document.addEventListener('click', e => {
+  const isProfile = e.target.closest('.av') || e.target.closest('#acc');
+  if (isProfile) {
+    if (localStorage.getItem('pr_token')) {
+      openFr();
+    } else {
+      if ($('lg')) $('lg').style.display = '';
+      go('lg');
+    }
+  }
+});
 </script>
 <script src="config.js"></script>
 <script src="net.js"></script>
