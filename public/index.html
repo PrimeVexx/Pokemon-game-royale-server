@@ -3301,6 +3301,9 @@ setInterval(() => {
     mostrarModos();
   }
 }, 250);
+if ($('lg')) { $('lg').classList.remove('on'); $('lg').style.display = 'none'; }
+if ($('menu')) { $('menu').style.display = 'flex'; $('menu').classList.add('on'); }
+if (typeof menu === 'function') menu();
 go('menu');
 </script>
 <script src="config.js"></script>
