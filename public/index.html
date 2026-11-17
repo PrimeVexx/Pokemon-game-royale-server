@@ -3388,27 +3388,39 @@ document.addEventListener('click', e => {
   }
   setInterval(renderBrTypeToggle, 300);
 
-  // 3. Cola Pública: busca jugadores reales durante 5s y rellena el resto con bots hasta 10
+   // 3. Cola Pública REAL: conecta al WebSocket de sala pública y busca jugadores durante 5s
   function startPublicMatchmaking() {
     const pubRoom = 'PUBLIC_BR_1';
-    if (typeof joinRoom === 'function') joinRoom(pubRoom);
-    else if (typeof connectRoom === 'function') connectRoom(pubRoom);
+    if (typeof join === 'function') join(pubRoom);
+    else if (typeof openRoom === 'function') openRoom(pubRoom);
+    else if (typeof R !== 'undefined' && R && typeof R.join === 'function') R.join(pubRoom);
+
+    if ($('play')) {
+      $('play').disabled = true;
+      $('play').textContent = '🌐 BUSCANDO JUGADORES...';
+    }
 
     let sec = 5;
-    go('queue');
     const qTimer = setInterval(() => {
+      if (R) {
+        R.presence({
+          n: MYN, mn: S.sel, skin: S.skin || '', u: MYID,
+          inMatch: 0, pubQueue: 1, ts: Date.now()
+        });
+      }
       const humanos = PE.filter(p => p && p.u);
       const count = Math.max(1, humanos.length);
-      if ($('qn')) $('qn').textContent = `🌐 Buscando jugadores (${count}/10)... ${sec}s`;
-      if ($('ql')) {
-        $('ql').innerHTML = humanos.map(h =>
-          `<span style="background:#4cd964;color:#111;padding:5px 10px;border-radius:6px;font-weight:900">${esc(h.n || 'Jugador')}</span>`
-        ).join('') + `<span style="background:#ffffff22;padding:5px 10px;border-radius:6px">🤖 +${10 - count} Bots</span>`;
-      }
+      if ($('play')) $('play').textContent = `🌐 EN COLA (${count}/10) · ${sec}s`;
+      tst(`🌐 Buscando jugadores reales: ${count}/10 (${sec}s)`);
+
       sec--;
       if (sec < 0 || count >= 10) {
         clearInterval(qTimer);
-        const pubSeed = 777000 + Math.floor(Date.now() / 30000);
+        if ($('play')) {
+          $('play').disabled = false;
+          $('play').textContent = 'JUGAR';
+        }
+        const pubSeed = 777000 + Math.floor(Date.now() / 20000);
         MATCH_SEED = pubSeed;
         startSyncedBR(pubSeed);
       }
